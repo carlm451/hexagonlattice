@@ -2,516 +2,519 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
-import os
+from typing import Tuple, Optional, List
+import warnings
 
-def generate_hexagonal_lattice(a=1.0, dim1_points=10, dim2_points=10):
+class OptimizedHexLattice:
     """
-    Generates Cartesian coordinates for a hexagonal lattice based on the given description.
-
-    Args:
-        a (float): The lattice spacing size.
-        dim1_points (int): Number of points along the first principal direction (x-axis).
-        dim2_points (int): Number of points along the second principal direction (120-degree).
-
-    Returns:
-        pandas.DataFrame: A DataFrame with 'x', 'y' Cartesian coordinates and 'label' for each point.
+    Highly optimized hexagonal lattice generator and visualizer.
+    Designed to handle large lattices efficiently while maintaining compatibility.
     """
-    x_coords = []
-    y_coords = []
-    labels = []
-
-    # Primitive translation vectors:
-    # v1 = (a, 0) along the x-axis
-    # v2 = (a * cos(120°), a * sin(120°)) rotated 120 degrees counterclockwise from x-axis
-    # cos(120°) = -0.5
-    # sin(120°) = sqrt(3)/2
-
-    for y_steps in range(dim2_points):
-        for x_steps in range(dim1_points):
-            # Calculate Cartesian coordinates for the point (x_steps, y_steps)
-            # P = x_steps * v1 + y_steps * v2
-            px = a * x_steps + a * (-0.5) * y_steps
-            py = a * (np.sqrt(3)/2) * y_steps
-
-            x_coords.append(px)
-            y_coords.append(py)
-            labels.append(f"({x_steps},{y_steps})")
-
-    return pd.DataFrame({'x': x_coords, 'y': y_coords, 'label': labels})
-
-def visualize_lattice(df, a, dim1_points):
-    """
-    Visualizes the hexagonal lattice using Plotly and returns the figure object (2D version).
-
-    Args:
-        df (pandas.DataFrame): DataFrame containing 'x', 'y' coordinates and 'label'.
-        a (float): The lattice spacing size.
-        dim1_points (int): Number of points along the first principal direction (x-axis).
-
-    Returns:
-        plotly.graph_objects.Figure: The Plotly figure object.
-    """
-    fig = go.Figure()
-
-    # Add lattice points
-    fig.add_trace(go.Scatter(x=df['x'].tolist(), y=df['y'].tolist(), mode='markers+text', text=df['label'],
-                             textposition="top center",
-                             marker=dict(size=8, color='blue'),
-                             name='Lattice Points'))
-    fig.update_layout(
-        xaxis_title="Cartesian X Coordinate",
-        yaxis_title="Cartesian Y Coordinate",
-        hovermode="closest",
-        showlegend=False,
-        width=900,
-        height=800,
-        # Ensure aspect ratio is respected for hexagonal shape
-        yaxis=dict(scaleanchor="x", scaleratio=1),
-        font=dict(size=10)
-    )
     
-    hexagon_side_length = a / np.sqrt(3)
-    angles = np.linspace(-np.pi / 6, 2 * np.pi - np.pi / 6, 7)[:-1] # 6 angles for 6 vertices, closing the shape, rotated 30 degrees clockwise
-
-    for index, row in df.iterrows():
-        center_x = row['x']
-        center_y = row['y']
-
-        hex_x = center_x + hexagon_side_length * np.cos(angles)
-        hex_y = center_y + hexagon_side_length * np.sin(angles)
-
-        fig.add_trace(go.Scatter(x=np.append(hex_x, hex_x[0]).tolist(), y=np.append(hex_y, hex_y[0]).tolist(),
-                                 mode='lines',
-                                 line=dict(color='red', width=2),
-                                 name=f'Hexagon at {row["label"]}'))
-
-    for index, row in df.iterrows():
-        x_steps = int(row['label'].split(',')[0].strip('('))
-        y_steps = int(row['label'].split(',')[1].strip(')'))
-
-        # Draw arrow in positive x direction
-        if x_steps < dim1_points - 1:
-            start_x = row['x']
-            start_y = row['y']
-            
-            # The next point in the x-direction is (x_steps + 1, y_steps)
-            end_x = a * (x_steps + 1) + a * (-0.5) * y_steps
-            end_y = a * (np.sqrt(3)/2) * y_steps
-
-            fig.add_annotation(
-                x=end_x,
-                y=end_y,
-                ax=start_x,
-                ay=start_y,
-                xref="x",
-                yref="y",
-                axref="x",
-                ayref="y",
-                showarrow=True,
-                arrowhead=2,
-                arrowsize=1,
-                arrowwidth=1,
-                arrowcolor="green"
-            )
-
-    # Update title to reflect the added hexagons and arrows
-    fig.update_layout(title="Hexagonal Lattice Visualization with Hexagons and X-direction Arrows")
-    return fig
+    def __init__(self, a: float = 1.0):
+        """Initialize with lattice spacing parameter."""
+        self.a = a
+        self.hexagon_side_length = a / np.sqrt(3)
+        # Pre-compute hexagon angles for efficiency
+        self.hex_angles = np.linspace(-np.pi / 6, 2 * np.pi - np.pi / 6, 7)[:-1]
+        self.cos_angles = np.cos(self.hex_angles)
+        self.sin_angles = np.sin(self.hex_angles)
     
-def visualize_lattice_3d_simple(df, a, dim1_points, wall_height=1.0, show_lattice_points=True, show_arrows=False):
+    def generate_lattice_fast(self, dim1_points: int, dim2_points: int) -> np.ndarray:
+        """
+        Ultra-fast lattice generation using pure NumPy vectorization.
+        Returns structured array for memory efficiency.
+        """
+        # Use meshgrid with optimized indexing
+        x_indices = np.arange(dim1_points, dtype=np.int32)
+        y_indices = np.arange(dim2_points, dtype=np.int32)
+        x_steps, y_steps = np.meshgrid(x_indices, y_indices, indexing='ij')
+        
+        # Flatten once and reuse
+        x_steps_flat = x_steps.ravel()
+        y_steps_flat = y_steps.ravel()
+        
+        # Vectorized coordinate calculation
+        px = self.a * (x_steps_flat - 0.5 * y_steps_flat)
+        py = self.a * (np.sqrt(3) * 0.5) * y_steps_flat
+        
+        # Return structured array for memory efficiency
+        dtype = [('x', 'f8'), ('y', 'f8'), ('x_step', 'i4'), ('y_step', 'i4')]
+        result = np.empty(len(px), dtype=dtype)
+        result['x'] = px
+        result['y'] = py
+        result['x_step'] = x_steps_flat
+        result['y_step'] = y_steps_flat
+        
+        return result
+    
+    def to_dataframe(self, lattice_data: np.ndarray) -> pd.DataFrame:
+        """Convert structured array to DataFrame for compatibility."""
+        labels = [f"({x},{y})" for x, y in zip(lattice_data['x_step'], lattice_data['y_step'])]
+        
+        return pd.DataFrame({
+            'x': lattice_data['x'],
+            'y': lattice_data['y'],
+            'label': labels,
+            'x_step': lattice_data['x_step'],
+            'y_step': lattice_data['y_step']
+        })
+    
+    def create_hexagon_mesh(self, lattice_data) -> Tuple[np.ndarray, np.ndarray]:
+        """Create hexagon vertices efficiently."""
+        if isinstance(lattice_data, pd.DataFrame):
+            centers_x = lattice_data['x'].values
+            centers_y = lattice_data['y'].values
+        else:  # structured array
+            centers_x = lattice_data['x']
+            centers_y = lattice_data['y']
+        
+        centers_x = centers_x[:, np.newaxis]
+        centers_y = centers_y[:, np.newaxis]
+        
+        vertices_x = centers_x + self.hexagon_side_length * self.cos_angles
+        vertices_y = centers_y + self.hexagon_side_length * self.sin_angles
+        
+        return vertices_x, vertices_y
+
+# Global instance for backward compatibility
+_global_lattice = OptimizedHexLattice()
+
+def generate_hexagonal_lattice(a: float = 1.0, dim1_points: int = 10, dim2_points: int = 10) -> pd.DataFrame:
     """
-    Alternative 3D visualization using simple cylinder walls (more reliable rendering).
+    Backward compatible function that returns DataFrame.
+    Optimized internally but maintains original interface.
     """
+    global _global_lattice
+    if _global_lattice.a != a:
+        _global_lattice = OptimizedHexLattice(a)
+    
+    # Generate using fast method
+    lattice_data = _global_lattice.generate_lattice_fast(dim1_points, dim2_points)
+    
+    # Convert to DataFrame for compatibility
+    return _global_lattice.to_dataframe(lattice_data)
+
+def visualize_lattice(df: pd.DataFrame, a: float, dim1_points: int) -> go.Figure:
+    """
+    Optimized 2D visualization maintaining original interface.
+    """
+    global _global_lattice
+    if _global_lattice.a != a:
+        _global_lattice = OptimizedHexLattice(a)
+    
+    n_points = len(df)
+    
+    # Adaptive settings based on size
+    show_labels = n_points <= 400
+    show_arrows = n_points <= 100
+    
     fig = go.Figure()
     
-    hexagon_side_length = a / np.sqrt(3)
-    
-    # Add cylindrical walls for each hexagon edge
-    for index, row in df.iterrows():
-        center_x = row['x']
-        center_y = row['y']
-        
-        # Get hexagon vertices
-        hex_x, hex_y = create_hexagon_vertices(center_x, center_y, hexagon_side_length)
-        
-        # Create walls as cylinders along each edge
-        for i in range(len(hex_x)):
-            next_i = (i + 1) % len(hex_x)
-            
-            # Calculate midpoint and direction for wall segment
-            mid_x = (hex_x[i] + hex_x[next_i]) / 2
-            mid_y = (hex_y[i] + hex_y[next_i]) / 2
-            
-            # Create a thick line (wall) between vertices
-            fig.add_trace(go.Scatter3d(
-                x=[hex_x[i], hex_x[next_i]],
-                y=[hex_y[i], hex_y[next_i]],
-                z=[wall_height/2, wall_height/2],
-                mode='lines',
-                line=dict(color='red', width=15),  # Very thick line to simulate wall
-                name=f'Wall {index}-{i}',
-                showlegend=False,
-                hoverinfo='skip'
-            ))
-            
-            # Add vertical pillars at corners
-            fig.add_trace(go.Scatter3d(
-                x=[hex_x[i], hex_x[i]],
-                y=[hex_y[i], hex_y[i]], 
-                z=[0, wall_height],
-                mode='lines',
-                line=dict(color='darkred', width=8),
-                showlegend=False,
-                hoverinfo='skip'
-            ))
-    
-    # Add ground reference
-    if len(df) > 0:
-        x_min, x_max = df['x'].min() - a, df['x'].max() + a
-        y_min, y_max = df['y'].min() - a, df['y'].max() + a
-        
-        # Ground plane as scatter points
-        ground_x, ground_y = np.meshgrid(
-            np.linspace(x_min, x_max, 20),
-            np.linspace(y_min, y_max, 20)
-        )
-        fig.add_trace(go.Scatter3d(
-            x=ground_x.flatten(),
-            y=ground_y.flatten(),
-            z=np.zeros_like(ground_x.flatten()),
-            mode='markers',
-            marker=dict(size=1, color='lightgray', opacity=0.3),
-            showlegend=False,
-            hoverinfo='skip'
-        ))
-    
     # Add lattice points
-    if show_lattice_points:
-        fig.add_trace(go.Scatter3d(
-            x=df['x'].tolist(),
-            y=df['y'].tolist(),
-            z=[wall_height/2] * len(df),
+    if show_labels:
+        fig.add_trace(go.Scatter(
+            x=df['x'],
+            y=df['y'],
             mode='markers+text',
             text=df['label'],
             textposition="top center",
-            marker=dict(size=8, color='blue'),
-            name='Lattice Points'
+            marker=dict(size=max(3, min(8, 100 // np.sqrt(n_points))), color='blue'),
+            name='Lattice Points',
+            hovertemplate='<b>%{text}</b><br>x=%{x:.2f}<br>y=%{y:.2f}<extra></extra>'
+        ))
+    else:
+        fig.add_trace(go.Scatter(
+            x=df['x'],
+            y=df['y'],
+            mode='markers',
+            marker=dict(size=max(2, min(6, 80 // np.sqrt(n_points))), color='blue'),
+            name='Lattice Points',
+            hovertemplate='x=%{x:.2f}<br>y=%{y:.2f}<extra></extra>'
         ))
     
-    # Add arrows
+    # Add hexagons efficiently
+    if n_points <= 2500:  # Only for reasonable sizes
+        vertices_x, vertices_y = _global_lattice.create_hexagon_mesh(df)
+        
+        hex_lines_x = []
+        hex_lines_y = []
+        
+        for i in range(len(df)):
+            # Close hexagon
+            hex_x = np.append(vertices_x[i], vertices_x[i, 0])
+            hex_y = np.append(vertices_y[i], vertices_y[i, 0])
+            
+            hex_lines_x.extend(hex_x.tolist())
+            hex_lines_y.extend(hex_y.tolist())
+            hex_lines_x.append(None)
+            hex_lines_y.append(None)
+        
+        fig.add_trace(go.Scatter(
+            x=hex_lines_x,
+            y=hex_lines_y,
+            mode='lines',
+            line=dict(color='red', width=max(0.5, min(2, 50 // np.sqrt(n_points)))),
+            name='Hexagons',
+            hoverinfo='skip',
+            showlegend=False
+        ))
+    
+    # Add arrows for small lattices
     if show_arrows:
-        for index, row in df.iterrows():
-            x_steps = int(row['label'].split(',')[0].strip('('))
-            y_steps = int(row['label'].split(',')[1].strip(')'))
+        for _, row in df.iterrows():
+            x_steps = row['x_step']
+            y_steps = row['y_step']
             
             if x_steps < dim1_points - 1:
                 start_x = row['x']
                 start_y = row['y']
-                arrow_z = wall_height / 2
-                
                 end_x = a * (x_steps + 1) + a * (-0.5) * y_steps
                 end_y = a * (np.sqrt(3)/2) * y_steps
                 
-                fig.add_trace(go.Scatter3d(
-                    x=[start_x, end_x],
-                    y=[start_y, end_y],
-                    z=[arrow_z, arrow_z],
-                    mode='lines',
-                    line=dict(color='green', width=8),
-                    name=f'Arrow {row["label"]}',
-                    showlegend=False
-                ))
+                fig.add_annotation(
+                    x=end_x, y=end_y,
+                    ax=start_x, ay=start_y,
+                    xref="x", yref="y", axref="x", ayref="y",
+                    showarrow=True, arrowhead=2, arrowsize=1,
+                    arrowwidth=1, arrowcolor="green"
+                )
     
-    # Update layout
+    # Optimized layout
+    dim2_points = len(df) // dim1_points
     fig.update_layout(
-        title="3D Hexagonal Lattice with Wall Structure",
-        scene=dict(
-            xaxis_title="X Coordinate",
-            yaxis_title="Y Coordinate", 
-            zaxis_title="Z Coordinate (Height)",
-            aspectmode='data',
-            camera=dict(eye=dict(x=1.5, y=1.5, z=1.5))
-        ),
+        title=f"Hexagonal Lattice ({dim1_points}×{dim2_points})",
+        xaxis_title="Cartesian X Coordinate",
+        yaxis_title="Cartesian Y Coordinate",
+        hovermode="closest",
+        showlegend=n_points < 500,
         width=900,
         height=800,
-        showlegend=False,
-        font=dict(size=10)
+        yaxis=dict(scaleanchor="x", scaleratio=1),
+        font=dict(size=max(8, min(12, 150 // np.sqrt(n_points))))
     )
     
     return fig
 
-def create_hexagon_vertices(center_x, center_y, hexagon_side_length):
+def visualize_lattice_3d(df: pd.DataFrame, a: float, dim1_points: int, 
+                        wall_height: float = 1.0,
+                        show_lattice_points: bool = True, 
+                        show_arrows: bool = False) -> go.Figure:
     """
-    Create the vertices of a hexagon given its center and side length.
-    
-    Args:
-        center_x (float): X coordinate of hexagon center
-        center_y (float): Y coordinate of hexagon center
-        hexagon_side_length (float): Side length of the hexagon
-    
-    Returns:
-        tuple: (hex_x, hex_y) arrays of hexagon vertex coordinates
+    Optimized 3D visualization maintaining original interface.
     """
-    angles = np.linspace(-np.pi / 6, 2 * np.pi - np.pi / 6, 7)[:-1]  # 6 vertices
-    hex_x = center_x + hexagon_side_length * np.cos(angles)
-    hex_y = center_y + hexagon_side_length * np.sin(angles)
-    return hex_x, hex_y
-
-def create_hexagon_wall_mesh(hex_x, hex_y, wall_height=1.0, base_z=0.0):
-    """
-    Create a 3D mesh for hexagonal walls by extruding the 2D hexagon.
+    global _global_lattice
+    if _global_lattice.a != a:
+        _global_lattice = OptimizedHexLattice(a)
     
-    Args:
-        hex_x (array): X coordinates of hexagon vertices
-        hex_y (array): Y coordinates of hexagon vertices
-        wall_height (float): Height of the walls
-        base_z (float): Z coordinate of the base
+    n_points = len(df)
+    dim2_points = n_points // dim1_points
     
-    Returns:
-        tuple: (vertices, faces) for the 3D mesh
-    """
-    n_vertices = len(hex_x)
+    # Auto-determine detail level
+    if n_points <= 100:
+        detail_level = 'high'
+        line_width = 3
+        marker_size = 6
+    elif n_points <= 400:
+        detail_level = 'medium'
+        line_width = 2
+        marker_size = 4
+    else:
+        detail_level = 'low'
+        line_width = 1
+        marker_size = 2
+        show_arrows = False  # Disable arrows for large lattices
+        show_lattice_points = True  # Always show points for reference
     
-    # Ensure we have valid vertices
-    if n_vertices < 3:
-        return None, None
-    
-    # Create vertices: bottom hexagon + top hexagon
-    vertices = []
-    
-    # Bottom vertices
-    for i in range(n_vertices):
-        vertices.append([hex_x[i], hex_y[i], base_z])
-    
-    # Top vertices
-    for i in range(n_vertices):
-        vertices.append([hex_x[i], hex_y[i], base_z + wall_height])
-    
-    vertices = np.array(vertices)
-    
-    # Create faces for the walls (no bottom or top faces, just walls)
-    faces = []
-    
-    # Wall faces (rectangles split into triangles)
-    for i in range(n_vertices):
-        next_i = (i + 1) % n_vertices
-        
-        # Bottom triangle of wall face
-        faces.append([i, next_i, next_i + n_vertices])
-        # Top triangle of wall face
-        faces.append([i, next_i + n_vertices, i + n_vertices])
-    
-    return vertices, faces
-
-def visualize_lattice_3d(df, a, dim1_points, wall_height=1.0, show_lattice_points=True, show_arrows=False):
-    """
-    Visualizes the hexagonal lattice as a 3D structure with extruded hexagonal walls.
-    Fixed version that handles null data issues.
-
-    Args:
-        df (pandas.DataFrame): DataFrame containing 'x', 'y' coordinates and 'label'.
-        a (float): The lattice spacing size.
-        dim1_points (int): Number of points along the first principal direction (x-axis).
-        wall_height (float): Height of the hexagonal walls.
-        show_lattice_points (bool): Whether to show the original lattice points.
-        show_arrows (bool): Whether to show directional arrows.
-
-    Returns:
-        plotly.graph_objects.Figure: The Plotly figure object.
-    """
     fig = go.Figure()
     
-    # Input validation
-    if df is None or len(df) == 0:
-        print("Error: DataFrame is empty or None")
-        return fig
-    
-    hexagon_side_length = a / np.sqrt(3)
-    
-    # Debug: Print some information
-    print(f"Processing {len(df)} hexagons with side length {hexagon_side_length}")
-    print(f"Wall height: {wall_height}")
-    
-    # Add wireframe edges instead of mesh (more reliable)
-    for index, row in df.iterrows():
-        try:
-            center_x = row['x']
-            center_y = row['y']
-            
-            # Get hexagon vertices
-            hex_x, hex_y = create_hexagon_vertices(center_x, center_y, hexagon_side_length)
-            
-            # Validate vertices
-            if len(hex_x) == 0 or len(hex_y) == 0:
-                print(f"Warning: Invalid vertices for hexagon {index}")
-                continue
-            
-            # Add wireframe edges for better visibility and reliability
-            for i in range(len(hex_x)):
-                next_i = (i + 1) % len(hex_x)
-                
-                # Vertical edges
-                fig.add_trace(go.Scatter3d(
-                    x=[hex_x[i], hex_x[i]],
-                    y=[hex_y[i], hex_y[i]],
-                    z=[0, wall_height],
-                    mode='lines',
-                    line=dict(color='darkred', width=4),
-                    showlegend=False,
-                    hoverinfo='skip'
-                ))
-                
-                # Bottom edges
-                fig.add_trace(go.Scatter3d(
-                    x=[hex_x[i], hex_x[next_i]],
-                    y=[hex_y[i], hex_y[next_i]],
-                    z=[0, 0],
-                    mode='lines',
-                    line=dict(color='red', width=4),
-                    showlegend=False,
-                    hoverinfo='skip'
-                ))
-                
-                # Top edges
-                fig.add_trace(go.Scatter3d(
-                    x=[hex_x[i], hex_x[next_i]],
-                    y=[hex_y[i], hex_y[next_i]],
-                    z=[wall_height, wall_height],
-                    mode='lines',
-                    line=dict(color='red', width=4),
-                    showlegend=False,
-                    hoverinfo='skip'
-                ))
-                
-        except Exception as e:
-            print(f"Error processing hexagon {index}: {e}")
-            continue
-    
-    # Add a simple ground plane for reference using Scatter3d
-    if len(df) > 0:
-        try:
-            x_min, x_max = df['x'].min() - a, df['x'].max() + a
-            y_min, y_max = df['y'].min() - a, df['y'].max() + a
-            
-            # Create a simple grid for ground reference
-            ground_x, ground_y = np.meshgrid(
-                np.linspace(x_min, x_max, 10),
-                np.linspace(y_min, y_max, 10)
-            )
-            
-            fig.add_trace(go.Scatter3d(
-                x=ground_x.flatten(),
-                y=ground_y.flatten(),
-                z=np.zeros_like(ground_x.flatten()),
-                mode='markers',
-                marker=dict(size=2, color='lightgray', opacity=0.3),
-                name='Ground',
-                showlegend=False,
-                hoverinfo='skip'
-            ))
-        except Exception as e:
-            print(f"Error creating ground plane: {e}")
-    
-    # Optionally add lattice points as markers
+    # Add lattice points
     if show_lattice_points:
-        try:
+        if detail_level == 'high' and n_points <= 200:
             fig.add_trace(go.Scatter3d(
-                x=df['x'].tolist(),
-                y=df['y'].tolist(),
-                z=[wall_height/2] * len(df),  # Place points at mid-height
+                x=df['x'],
+                y=df['y'],
+                z=[wall_height/2] * n_points,
                 mode='markers+text',
-                text=df['label'].tolist(),
+                text=df['label'],
                 textposition="top center",
-                marker=dict(size=6, color='blue'),
-                name='Lattice Points'
+                marker=dict(size=marker_size, color='blue'),
+                name='Lattice Points',
+                hovertemplate='<b>%{text}</b><br>x=%{x:.2f}<br>y=%{y:.2f}<extra></extra>'
             ))
-        except Exception as e:
-            print(f"Error adding lattice points: {e}")
+        else:
+            fig.add_trace(go.Scatter3d(
+                x=df['x'],
+                y=df['y'],
+                z=[wall_height/2] * n_points,
+                mode='markers',
+                marker=dict(size=marker_size, color='blue'),
+                name='Lattice Points',
+                hovertemplate='x=%{x:.2f}<br>y=%{y:.2f}<extra></extra>'
+            ))
     
-    # Optionally add directional arrows (simplified for 3D)
-    if show_arrows:
-        try:
-            for index, row in df.iterrows():
-                try:
-                    label_parts = row['label'].strip('()').split(',')
-                    x_steps = int(label_parts[0])
-                    y_steps = int(label_parts[1])
-                    
-                    # Draw arrow in positive x direction
-                    if x_steps < dim1_points - 1:
-                        start_x = row['x']
-                        start_y = row['y']
-                        arrow_z = wall_height / 2
-                        
-                        # The next point in the x-direction is (x_steps + 1, y_steps)
-                        end_x = a * (x_steps + 1) + a * (-0.5) * y_steps
-                        end_y = a * (np.sqrt(3)/2) * y_steps
-                        
-                        # Add arrow as a line
-                        fig.add_trace(go.Scatter3d(
-                            x=[start_x, end_x],
-                            y=[start_y, end_y],
-                            z=[arrow_z, arrow_z],
-                            mode='lines',
-                            line=dict(color='green', width=6),
-                            name=f'Arrow {row["label"]}',
-                            showlegend=False
-                        ))
-                except Exception as e:
-                    print(f"Error processing arrow for row {index}: {e}")
-                    continue
-        except Exception as e:
-            print(f"Error adding arrows: {e}")
+    # Add 3D hexagon structures
+    if detail_level == 'high':
+        _add_full_wireframes_3d(fig, df, _global_lattice, wall_height, line_width)
+    elif detail_level == 'medium':
+        _add_medium_wireframes_3d(fig, df, _global_lattice, wall_height, line_width)
+    else:  # low detail
+        _add_simple_outlines_3d(fig, df, _global_lattice, wall_height, line_width)
     
-    # Update layout for 3D visualization
+    # Add arrows for small lattices
+    if show_arrows and detail_level == 'high':
+        _add_arrows_3d(fig, df, a, dim1_points, wall_height)
+    
+    # Add ground reference
+    if n_points < 1000:
+        _add_ground_reference(fig, df, a)
+    
     fig.update_layout(
-        title="3D Hexagonal Lattice with Wall Structure (Wireframe)",
+        title=f"3D Hexagonal Lattice ({dim1_points}×{dim2_points}) - {detail_level.title()} Detail",
         scene=dict(
             xaxis_title="X Coordinate",
             yaxis_title="Y Coordinate",
             zaxis_title="Z Coordinate (Height)",
-            aspectmode='data',  # Maintain aspect ratio
-            camera=dict(
-                eye=dict(x=1.5, y=1.5, z=1.5)  # Nice viewing angle
-            )
+            aspectmode='data',
+            camera=dict(eye=dict(x=1.5, y=1.5, z=1.2))
         ),
         width=900,
         height=800,
-        showlegend=False,
-        font=dict(size=10)
+        showlegend=n_points < 500,
+        font=dict(size=max(8, min(12, 150 // np.sqrt(n_points))))
     )
     
     return fig
 
-# Example usage and test function
-def test_lattice_visualization():
+def visualize_lattice_3d_simple(df: pd.DataFrame, a: float, dim1_points: int, 
+                               wall_height: float = 1.0, 
+                               show_lattice_points: bool = True, 
+                               show_arrows: bool = False) -> go.Figure:
     """
-    Test function to demonstrate the lattice visualization
+    Simple 3D visualization for compatibility - uses minimal detail level.
     """
-    try:
-        # Generate a small lattice for testing
-        df = generate_hexagonal_lattice(a=1.0, dim1_points=3, dim2_points=3)
-        print(f"Generated lattice with {len(df)} points")
-        print(df.head())
+    global _global_lattice
+    if _global_lattice.a != a:
+        _global_lattice = OptimizedHexLattice(a)
+    
+    n_points = len(df)
+    dim2_points = n_points // dim1_points
+    
+    fig = go.Figure()
+    
+    # Always show lattice points in simple mode
+    if show_lattice_points:
+        fig.add_trace(go.Scatter3d(
+            x=df['x'],
+            y=df['y'],
+            z=[wall_height/2] * n_points,
+            mode='markers',
+            marker=dict(size=4, color='blue'),
+            name='Lattice Points',
+            hovertemplate='x=%{x:.2f}<br>y=%{y:.2f}<extra></extra>'
+        ))
+    
+    # Add simple outlines only
+    _add_simple_outlines_3d(fig, df, _global_lattice, wall_height, 1)
+    
+    fig.update_layout(
+        title=f"3D Hexagonal Lattice ({dim1_points}×{dim2_points}) - Simple",
+        scene=dict(
+            xaxis_title="X Coordinate",
+            yaxis_title="Y Coordinate",
+            zaxis_title="Z Coordinate (Height)",
+            aspectmode='data',
+            camera=dict(eye=dict(x=1.5, y=1.5, z=1.2))
+        ),
+        width=900,
+        height=800,
+        showlegend=True
+    )
+    
+    return fig
+
+# Helper functions for 3D visualization
+def _add_full_wireframes_3d(fig, df, lattice, wall_height, line_width):
+    """Add full 3D wireframes."""
+    vertices_x, vertices_y = lattice.create_hexagon_mesh(df)
+    
+    wire_x, wire_y, wire_z = [], [], []
+    
+    for i in range(len(df)):
+        hex_x, hex_y = vertices_x[i], vertices_y[i]
         
-        # Test 2D visualization
-        fig_2d = visualize_lattice(df, a=1.0, dim1_points=3)
-        print("2D visualization created successfully")
+        # Vertical edges
+        for j in range(6):
+            wire_x.extend([hex_x[j], hex_x[j], None])
+            wire_y.extend([hex_y[j], hex_y[j], None])
+            wire_z.extend([0, wall_height, None])
         
-        # Test 3D visualization (simple version)
-        fig_3d_simple = visualize_lattice_3d_simple(df, a=1.0, dim1_points=3, wall_height=1.0)
-        print("3D simple visualization created successfully")
+        # Horizontal edges (bottom and top)
+        for z_level in [0, wall_height]:
+            hex_x_closed = np.append(hex_x, hex_x[0])
+            hex_y_closed = np.append(hex_y, hex_y[0])
+            wire_x.extend(hex_x_closed.tolist() + [None])
+            wire_y.extend(hex_y_closed.tolist() + [None])
+            wire_z.extend([z_level] * 7 + [None])
+    
+    fig.add_trace(go.Scatter3d(
+        x=wire_x, y=wire_y, z=wire_z,
+        mode='lines',
+        line=dict(color='red', width=line_width),
+        name='Hexagon Walls',
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+def _add_medium_wireframes_3d(fig, df, lattice, wall_height, line_width):
+    """Add medium detail wireframes (top and some verticals)."""
+    vertices_x, vertices_y = lattice.create_hexagon_mesh(df)
+    
+    wire_x, wire_y, wire_z = [], [], []
+    
+    for i in range(len(df)):
+        hex_x, hex_y = vertices_x[i], vertices_y[i]
         
-        # Test 3D visualization (fixed version)
-        fig_3d = visualize_lattice_3d(df, a=1.0, dim1_points=3, wall_height=1.0, 
-                                      show_lattice_points=True, show_arrows=True)
-        print("3D visualization created successfully")
+        # Every other vertical edge to reduce complexity
+        for j in range(0, 6, 2):
+            wire_x.extend([hex_x[j], hex_x[j], None])
+            wire_y.extend([hex_y[j], hex_y[j], None])
+            wire_z.extend([0, wall_height, None])
         
-        return fig_2d, fig_3d_simple, fig_3d
+        # Top edge only
+        hex_x_closed = np.append(hex_x, hex_x[0])
+        hex_y_closed = np.append(hex_y, hex_y[0])
+        wire_x.extend(hex_x_closed.tolist() + [None])
+        wire_y.extend(hex_y_closed.tolist() + [None])
+        wire_z.extend([wall_height] * 7 + [None])
+    
+    fig.add_trace(go.Scatter3d(
+        x=wire_x, y=wire_y, z=wire_z,
+        mode='lines',
+        line=dict(color='red', width=line_width),
+        name='Hexagon Outlines',
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+def _add_simple_outlines_3d(fig, df, lattice, wall_height, line_width):
+    """Add simple top outlines only."""
+    vertices_x, vertices_y = lattice.create_hexagon_mesh(df)
+    
+    outline_x, outline_y, outline_z = [], [], []
+    
+    for i in range(len(df)):
+        hex_x = np.append(vertices_x[i], vertices_x[i, 0])
+        hex_y = np.append(vertices_y[i], vertices_y[i, 0])
         
-    except Exception as e:
-        print(f"Error in test function: {e}")
-        return None, None, None
+        outline_x.extend(hex_x.tolist() + [None])
+        outline_y.extend(hex_y.tolist() + [None])
+        outline_z.extend([wall_height] * 7 + [None])
+    
+    fig.add_trace(go.Scatter3d(
+        x=outline_x, y=outline_y, z=outline_z,
+        mode='lines',
+        line=dict(color='red', width=line_width),
+        name='Hexagon Outlines',
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+def _add_arrows_3d(fig, df, a, dim1_points, wall_height):
+    """Add 3D arrows."""
+    arrow_x, arrow_y, arrow_z = [], [], []
+    
+    for _, row in df.iterrows():
+        x_steps = row['x_step']
+        y_steps = row['y_step']
+        
+        if x_steps < dim1_points - 1:
+            start_x = row['x']
+            start_y = row['y']
+            end_x = a * (x_steps + 1) + a * (-0.5) * y_steps
+            end_y = a * (np.sqrt(3)/2) * y_steps
+            arrow_z_level = wall_height / 2
+            
+            arrow_x.extend([start_x, end_x, None])
+            arrow_y.extend([start_y, end_y, None])
+            arrow_z.extend([arrow_z_level, arrow_z_level, None])
+    
+    if arrow_x:  # Only add if there are arrows
+        fig.add_trace(go.Scatter3d(
+            x=arrow_x, y=arrow_y, z=arrow_z,
+            mode='lines',
+            line=dict(color='green', width=2),
+            name='Direction Arrows',
+            hoverinfo='skip',
+            showlegend=False
+        ))
+
+def _add_ground_reference(fig, df, a):
+    """Add ground reference."""
+    if len(df) == 0:
+        return
+        
+    x_min, x_max = df['x'].min(), df['x'].max()
+    y_min, y_max = df['y'].min(), df['y'].max()
+    
+    # Adaptive resolution
+    resolution = max(5, min(15, int(40 / np.sqrt(len(df)))))
+    
+    ground_x, ground_y = np.meshgrid(
+        np.linspace(x_min - a/2, x_max + a/2, resolution),
+        np.linspace(y_min - a/2, y_max + a/2, resolution)
+    )
+    
+    fig.add_trace(go.Scatter3d(
+        x=ground_x.flatten(),
+        y=ground_y.flatten(),
+        z=np.zeros(ground_x.size),
+        mode='markers',
+        marker=dict(size=1, color='lightgray', opacity=0.3),
+        name='Ground',
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+# Performance monitoring functions
+def get_performance_info(dim1_points: int, dim2_points: int) -> dict:
+    """Get performance information for given lattice size."""
+    total_points = dim1_points * dim2_points
+    
+    if total_points <= 100:
+        performance_level = "Excellent"
+        recommendation = "Full detail rendering with all features enabled"
+    elif total_points <= 400:
+        performance_level = "Good"
+        recommendation = "Medium detail rendering, some features may be disabled"
+    elif total_points <= 1000:
+        performance_level = "Fair"
+        recommendation = "Reduced detail rendering, labels and arrows disabled"
+    else:
+        performance_level = "Challenging"
+        recommendation = "Minimal detail rendering, may be slow"
+    
+    return {
+        'total_points': total_points,
+        'performance_level': performance_level,
+        'recommendation': recommendation
+    }
 
 if __name__ == "__main__":
-    test_lattice_visualization()
+    # Test compatibility
+    print("Testing backward compatibility...")
+    
+    # Test original interface
+    df = generate_hexagonal_lattice(a=1.0, dim1_points=5, dim2_points=5)
+    print(f"Generated DataFrame with {len(df)} points")
+    
+    # Test 2D visualization
+    fig_2d = visualize_lattice(df, 1.0, 5)
+    print("2D visualization created successfully")
+    
+    # Test 3D visualizations
+    fig_3d = visualize_lattice_3d(df, 1.0, 5)
+    fig_3d_simple = visualize_lattice_3d_simple(df, 1.0, 5)
+    print("3D visualizations created successfully")
+    
+    print("All compatibility tests passed!")
