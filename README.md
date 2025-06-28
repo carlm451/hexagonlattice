@@ -1,7 +1,7 @@
 # Hexagonal Lattice Visualizer  
 *― A cybernetic interface for crystallographic geometry*
 
-> ![images/hexdemo.png]  
+> [Hexagonal Lattice Demo](images/hexdemo.png "Click to enlarge")  
 > *(Insert screenshot of landing page above this line)*
 
 Welcome, Operator.
