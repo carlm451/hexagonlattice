@@ -39,28 +39,25 @@ def generate_hexagonal_lattice(a=1.0, dim1_points=10, dim2_points=10):
 
     return pd.DataFrame({'x': x_coords, 'y': y_coords, 'label': labels})
 
-def visualize_lattice(df, a, dim1_points, output_filename="hexagonal_lattice.html"):
+def visualize_lattice(df, a, dim1_points):
     """
-    Visualizes the hexagonal lattice using Plotly and saves it to an HTML file.
+    Visualizes the hexagonal lattice using Plotly and returns the figure object.
 
     Args:
         df (pandas.DataFrame): DataFrame containing 'x', 'y' coordinates and 'label'.
         a (float): The lattice spacing size.
         dim1_points (int): Number of points along the first principal direction (x-axis).
-        output_filename (str): The name of the HTML file to save the visualization.
-    """
-    """
-    Visualizes the hexagonal lattice using Plotly and saves it to an HTML file.
 
-    Args:
-        df (pandas.DataFrame): DataFrame containing 'x', 'y' coordinates and 'label'.
-        output_filename (str): The name of the HTML file to save the visualization.
+    Returns:
+        plotly.graph_objects.Figure: The Plotly figure object.
     """
-    fig = px.scatter(df, x="x", y="y", text="label",
-                     title="Hexagonal Lattice Visualization (10x10 points)",
-                     labels={"x": "Cartesian X", "y": "Cartesian Y"})
+    fig = go.Figure()
 
-    fig.update_traces(textposition="top center", marker=dict(size=8, color='blue'))
+    # Add lattice points
+    fig.add_trace(go.Scatter(x=df['x'].tolist(), y=df['y'].tolist(), mode='markers+text', text=df['label'],
+                             textposition="top center",
+                             marker=dict(size=8, color='blue'),
+                             name='Lattice Points'))
     fig.update_layout(
         xaxis_title="Cartesian X Coordinate",
         yaxis_title="Cartesian Y Coordinate",
@@ -73,7 +70,7 @@ def visualize_lattice(df, a, dim1_points, output_filename="hexagonal_lattice.htm
         font=dict(size=10)
     )
     
-    hexagon_side_length = 0.5
+    hexagon_side_length = a / np.sqrt(3)
     angles = np.linspace(-np.pi / 6, 2 * np.pi - np.pi / 6, 7)[:-1] # 6 angles for 6 vertices, closing the shape, rotated 30 degrees clockwise
 
     for index, row in df.iterrows():
@@ -83,9 +80,9 @@ def visualize_lattice(df, a, dim1_points, output_filename="hexagonal_lattice.htm
         hex_x = center_x + hexagon_side_length * np.cos(angles)
         hex_y = center_y + hexagon_side_length * np.sin(angles)
 
-        fig.add_trace(go.Scatter(x=np.append(hex_x, hex_x[0]), y=np.append(hex_y, hex_y[0]),
+        fig.add_trace(go.Scatter(x=np.append(hex_x, hex_x[0]).tolist(), y=np.append(hex_y, hex_y[0]).tolist(),
                                  mode='lines',
-                                 line=dict(color='red', width=1),
+                                 line=dict(color='red', width=2),
                                  name=f'Hexagon at {row["label"]}'))
 
     for index, row in df.iterrows():
@@ -120,17 +117,4 @@ def visualize_lattice(df, a, dim1_points, output_filename="hexagonal_lattice.htm
     # Update title to reflect the added hexagons and arrows
     fig.update_layout(title="Hexagonal Lattice Visualization with Hexagons and X-direction Arrows")
     
-    # Get the absolute path for the output file
-    current_dir = os.getcwd()
-    full_output_path = os.path.join(current_dir, output_filename)
-
-    fig.write_html(full_output_path, auto_open=False)
-    print(f"Hexagonal lattice visualization saved to: {full_output_path}")
-    print(f"You can open it in your web browser by navigating to: file://{full_output_path}")
-
-if __name__ == "__main__":
-    a_val = 1.0
-    dim1_pts = 10
-    dim2_pts = 10
-    lattice_df = generate_hexagonal_lattice(a=a_val, dim1_points=dim1_pts, dim2_points=dim2_pts)
-    visualize_lattice(lattice_df, a_val, dim1_pts)
+    return fig
