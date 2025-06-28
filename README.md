@@ -1,125 +1,176 @@
 # Hexagonal Lattice Visualizer  
-*― A cybernetic interface for crystallographic geometry*
+*― A cybernetic interface for crystallographic geometry and spatial quantization*
 
 > ![Hexagonal Lattice Demo](images/hexdemo.png)  
 > *(Insert screenshot of landing page above this line)*
 
 Welcome, Operator.
 
-You’ve accessed the **Hexagonal Lattice Visualizer**—a parametric simulation platform designed to extrapolate pseudo-crystalline behavior through the rendering of extruded hexagonal substructures in (x, y, z) space. This lattice system is based on the generalized **Quantized Hexahedral Field Equation**:
+You’ve accessed the **Hexagonal Lattice Visualizer**—a parametric simulation platform designed to extrapolate pseudo-crystalline behavior through dynamic rendering of hexagonal substructures extruded in quantized (x, y, z) hyperspace. The lattice dynamics follow the **Generalized Quantized Hexahedral Field Equation (GQHFE)**:
 
 $$
-\mathcal{L}(N, M) = \sum_{i=1}^N \sum_{j=1}^M H_{ij} \cdot e^{-\frac{\Delta_\phi}{\psi_{q}}}
+\mathcal{L}(N, M, \tau) = \sum_{i=1}^N \sum_{j=1}^M \sum_{t=1}^{\tau} H_{ij}^{(t)} \cdot e^{-\frac{\Delta_\phi^2}{\hbar \psi_{q}}} \cdot \cos\left(\frac{2\pi t}{\Theta_{ij} + \epsilon}\right)
 $$
 
 Where:
-- \( H_{ij} \) is the cell activation tensor
-- \( \Delta_\phi \) is the angular drift parameter
-- \( \psi_q \) is the pseudo-bonding potential from adjacent dimensional stacks
+- \( H_{ij}^{(t)} \) is the time-evolving **cell excitation tensor** under sublattice flux  
+- \( \Delta_\phi \) is the angular momentum drift parameter  
+- \( \psi_q \) is the pseudo-bonding potential across stacked brane dimensions  
+- \( \Theta_{ij} \) is the local topological phase shift per hex-cell  
+- \( \hbar \) is the reduced Planck constant  
+- \( \epsilon \) is a perturbative stabilizer (default: \(10^{-12}\))  
+
+Hexagonal symmetry is governed by a modified **Bravais-Klein manifold tiling** over 2.5D conformal spacetime, satisfying the noncommutative metric:
+
+$$
+[g_{\mu\nu}] = 
+\begin{bmatrix}
+1 & \alpha & 0 \\
+\alpha & 1 & \beta \\
+0 & \beta & \gamma
+\end{bmatrix}
+$$
 
 ---
 
 ## ⚙️ Feature Matrix
 
-- **⧉ Interactive 3D Lattice Engine**  
-    Real-time rendering of extruded hexagonal superstructures via **PhotonMesh v2.7** integrated into Plotly.js. Rotatable and zoomable through direct matrix manipulation.
+- **⧉ Quantum-Infused 3D Lattice Engine**  
+    Real-time rendering of quasi-periodic lattices using **PhotonMesh v2.7**, integrated into Plotly.js. Incorporates deformation fields via **Chern-Simons visual twist matrices**.
 
-- **⇳ Dimensional Parameterization via User-Injection**  
-    Parameters \( N, M \in \mathbb{Z}^+ \) define lattice width along bifurcated basis vectors \( \vec{v}_1, \vec{v}_2 \). Input validation backed by the **ChronoGuard Protocol** to prevent excessive recursion depth.
+- **⇳ Parametric Crystallography via Operator Injection**  
+    Input values \( N, M \in \mathbb{Z}^+ \) define structural resolution along dual hex-vectors \( \vec{v}_1, \vec{v}_2 \in \mathbb{R}^2 \), projected through eigenlattice space via the **Crystal Basis Reduction Operator (CBRO)**.
 
-- **⛶ Geometry Extrusion Mode (GEM)**  
-    Hex cells extruded along the z-axis, creating true-to-form pseudo-volumes. Geometry calculated using the **HexPrism Triangulation Kernel** (HPTK-9).
+- **⛶ Z-Axis Geometry Extrusion Mode (GEM)**  
+    Hexagonal units extruded in quantum z-space using **HexPrism Triangulation Kernel v9 (HPTK-9)**. Volume expansion follows the 3D cell deformation tensor:
 
-- **λ Axis-Colored Connectivity**  
-    Vector-encoded edge connections colored by directional bias:  
-    \( \vec{d}_1 \to \text{blue} \), \( \vec{d}_2 \to \text{orange} \), \( \vec{d}_3 \to \text{purple} \).  
-    Implements the **Spectral Directional Encoding Scheme (SDES-4)**.
+    $$
+    \mathbf{T}_{\text{vol}} = \frac{\partial \vec{r}}{\partial \vec{\xi}} \cdot \Lambda(\kappa)
+    $$
+
+    where \( \Lambda(\kappa) \) is the scalar curvature modulus under extrinsic deformation.
+
+- **λ Axis-Colored Quantum Connectivity**  
+    Vector edges exhibit chromatic encoding via **Spectral Directional Encoding Scheme (SDES-4)**:  
+    - \( \vec{d}_1 \to \text{blue} \)  
+    - \( \vec{d}_2 \to \text{orange} \)  
+    - \( \vec{d}_3 \to \text{purple} \)  
+
+    Edge tensors conform to anti-symmetric forms under Pauli lattice transformations.
 
 - **☰ Cyberpunk Interface**  
-    Designed using **VoidUI v4.1** – high-contrast, neon-over-dark design schema inspired by the *Neon Dominion Archives*.
+    Visual shell built with **VoidUI v4.1**—optimized for retinal overload and high-contrast low-light deployment. Features embedded synaesthetic UI flicker and glyph-encoded alerts.
 
-- **🛡️ Input Range Defense Protocol**  
-    Upper limit of \( \text{max}(N, M) = 25 \) enforced by hardcoded **HeisenLimiter** to prevent quantum feedback overflow.
+- **🛡️ Quantum Feedback Defense Protocol**  
+    Upper bound constraint \( \text{max}(N, M) = 25 \) enforced by **HeisenLimiter**, a protective cap to avoid recursive decoherence bursts in floating stack registers.
+
+---
+
+## 🔬 Extended Mathematical Foundation
+
+- **Crystallographic Axes** defined under hexagonal class \( P6_3/mmc \)  
+- **Lattice Constant Set**:  
+    \( a = b = 1.0 \), \( c = \sqrt{2} \)  
+    Angles: \( \alpha = \beta = 90^\circ \), \( \gamma = 120^\circ \)
+
+- **Reciprocal Lattice Matrix** (in units of \( \frac{2\pi}{a} \)):
+
+$$
+\mathbf{G} =
+\begin{bmatrix}
+1 & -\frac{1}{2} & 0 \\
+0 & \frac{\sqrt{3}}{2} & 0 \\
+0 & 0 & \frac{2\pi}{c}
+\end{bmatrix}
+$$
+
+- **Quantum-Lattice Path Integral Estimate**:
+
+$$
+Z = \int \mathcal{D}[\phi] \, e^{-S[\phi]/\hbar}
+$$
+
+With effective action:
+
+$$
+S[\phi] = \int d^3x \left( \frac{1}{2} \partial_\mu \phi \, \partial^\mu \phi + \frac{\lambda}{4!} \phi^4 \right)
+$$
 
 ---
 
 ## 🔧 System Stack
 
-- **Language Core**: Python 3.10 (Backed by Flask 1.1.2)  
+- **Language Core**: Python 3.10 (Flask 1.1.2)  
 - **Frontend Engine**: HTML, CSS, Vanilla JS, Plotly.js  
-- **Scientific Layer**: `numpy`, `pandas`, `plotly`, augmented with **FictiMathLib** (internal only)  
-- **Simulation Theory**: Based loosely on **Tessellation Inversion Dynamics**, per *Yakamoto & Singh, 2147*.
+- **Math Core**: `numpy`, `pandas`, `plotly`, with in-house **FictiMathLib v7.3** for tensor diagonalization and eigenstate propagation  
+- **Simulation Theory**: Draws from **Fractal Zone Tessellation**, **Quasicrystal Mapping**, and the extended framework of *Yakamoto-Singh Space-Time Tilings (2147)*
 
 ---
 
 ## 🧪 Installation + Execution Protocol
 
-For *Linux-class Operators*. Shell-executable terminal ops below:
+For *Linux-class Operators*. Execute the following terminal ops:
 
-1. **Navigate into Repository Matrix**  
-    ```bash
-    cd /home/carlbrady/gemini/library
-    ```
+```bash
+# Step 1: Clone the repository and enter the directory
+git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
+cd YOUR_REPO_NAME
 
-2. **Initialize Local Isolated Python Environment**  
-    ```bash
-    python3 -m venv venv
-    ```
+# Step 2: Create a virtual environment
+python3 -m venv venv
 
-3. **Activate Virtual Memory Node**  
-    ```bash
-    source venv/bin/activate
-    ```
+# Step 3: Activate the virtual environment
+source venv/bin/activate
 
-4. **Download Simulation Dependencies**  
-    ```bash
-    pip install -r requirements.txt
-    ```
+# Step 4: Install Python dependencies
+pip install -r requirements.txt
 
-5. **Ignite Simulation Flask Core**  
-    ```bash
-    python app.py
-    ```
+# Step 5: Run the Flask app
+python app.py
 
-6. **Engage Browser Interface Layer**  
-    Launch browser:  
-    ```
-    http://127.0.0.1:5000/
-    ```
+# Step 6: Open the app in your browser
+# Usually at: http://127.0.0.1:5000/
 
----
+🚀 Operating Manual
+Once connected to the lattice core:
 
-## 🚀 Operating Manual
+Input values for 
+𝑁
+N, 
+𝑀
+M, then initiate the HexMesh Compiler.
 
-Once connected to the lattice core interface:
+Gestural interface supports:
 
-- Input integer values \( N \), \( M \) into the terminal control panel.
-- Hit `Generate Lattice` to execute the **HexMesh Compiler**.
-- Interact via orbital gestures:  
-  - **Rotate** with left click + drag  
-  - **Zoom** with scroll  
-  - **Pan** with right click + drag
+Rotation: left click + drag
 
----
+Zoom: scroll wheel
 
-## 📁 Directory Topology
+Translation: right click + drag
 
-- `app.py` → Core Flask daemon. Connects frontend and simulation engine.
-- `hexagonal_lattice_generator.py` → Contains **LatticeFieldEngine**, geometry generators, and render structs.
-- `templates/index.html` → Quantum shell interface w/ embedded Plotly.js.
-- `requirements.txt` → Dependency matrix. Feed to `pip`.
-- `venv/` → Localized Python runtime hyperstructure (generated during setup).
+All transformations are tracked via the Lattice Affine History Tensor
 
----
+📁 Directory Topology
+app.py → Core Flask daemon
 
-## 📡 Future Work & Speculative Extensions
+hexagonal_lattice_generator.py → Houses the LatticeFieldEngine, subcell matrix expansion, and geometric binding logics
 
-- Integration with **QuBitMesh™** GPU accelerator  
-- Multilattice layering via **Z-Brane Overlays**  
-- Import/export using `.dimfield` and `.lattx` formats  
-- Support for **Edge-Entangled Topologies** (Ono & Ibrahim, 2192)
+templates/index.html → Neon interface shell using quantum webgl shaders
 
----
+requirements.txt → Dependency graph for instantiation
 
-*Prepare the grid. Project the shell. Initialize geometry.*  
-**You are now inside the lattice.**
+venv/ → Virtual Python environment generated during boot
+
+📡 Future Work & Speculative Extensions
+Support for QuBitMesh™ lattice solvers (GPU-accelerated, entanglement-aware)
+
+Extension to Multi-Brane Hyperlattices using Z-Brane Overlays
+
+Export to .dimfield, .lattx, and Quantum Voxel Field formats
+
+Edge computation in Entangled Spin Topologies (Ono & Ibrahim, 2192)
+
+Field coupling to external graviton backscatter arrays
+
+Phase-align your core. Collapse the observer function. Enter the lattice.
+You are now embedded in the hexafield.
