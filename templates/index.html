@@ -3,92 +3,229 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hexagonal Lattice Generator</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <title>Hexagonal Lattice Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.26.0/plotly.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-top: 20px;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
             margin-bottom: 20px;
-            padding: 15px;
-            border: 1px solid #ccc;
+            padding: 20px;
+            background-color: #f8f9fa;
             border-radius: 8px;
-            background-color: #f9f9f9;
         }
-        .controls label {
-            margin-right: 10px;
+        .control-group {
+            display: flex;
+            flex-direction: column;
         }
-        .controls input[type="number"] {
-            width: 60px;
-            padding: 5px;
-            border-radius: 4px;
+        label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        input, select {
+            padding: 8px;
             border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
         }
-        .controls button {
-            padding: 8px 15px;
+        button {
             background-color: #007bff;
             color: white;
+            padding: 10px 20px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
         }
-        .controls button:hover {
+        button:hover {
             background-color: #0056b3;
         }
-        #lattice-graph {
-            width: 900px;
-            height: 800px;
-            border: 1px solid #eee;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        #plot {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background-color: white;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .viz-mode-section {
+            grid-column: 1 / -1;
+            border-top: 1px solid #ddd;
+            padding-top: 15px;
+            margin-top: 10px;
+        }
+        .three-d-controls {
+            display: none;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #e8f4f8;
+            border-radius: 6px;
+        }
+        .three-d-controls.active {
+            display: grid;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
         }
     </style>
 </head>
 <body>
-    <h1>Hexagonal Lattice Generator</h1>
-
-    <div class="controls">
-        <label for="n_points">N (Dim 1 Points):</label>
-        <input type="number" id="n_points" value="10" min="1" max="25">
-        <label for="m_points">M (Dim 2 Points):</label>
-        <input type="number" id="m_points" value="10" min="1" max="25">
-        <button onclick="generateLattice()">Generate Lattice</button>
+    <div class="container">
+        <h1>Hexagonal Lattice Visualizer</h1>
+        <p>Generate and visualize hexagonal lattices in 2D or 3D with customizable parameters.</p>
+        
+        <div id="error-message" class="error" style="display: none;"></div>
+        
+        <form id="lattice-form">
+            <div class="controls">
+                <div class="control-group">
+                    <label for="n_points">N Points (X-direction):</label>
+                    <input type="number" id="n_points" name="n_points" value="5" min="1" max="25" required>
+                </div>
+                
+                <div class="control-group">
+                    <label for="m_points">M Points (120° direction):</label>
+                    <input type="number" id="m_points" name="m_points" value="4" min="1" max="25" required>
+                </div>
+                
+                <div class="viz-mode-section">
+                    <div class="control-group">
+                        <label for="viz_mode">Visualization Mode:</label>
+                        <select id="viz_mode" name="viz_mode">
+                            <option value="2d">2D Lattice</option>
+                            <option value="3d">3D Hexagonal Rooms</option>
+                        </select>
+                    </div>
+                    
+                    <div id="three-d-controls" class="three-d-controls">
+                        <div class="control-group">
+                            <label for="wall_height">Wall Height:</label>
+                            <input type="number" id="wall_height" name="wall_height" value="1.0" min="0.1" max="5.0" step="0.1">
+                        </div>
+                        
+                        <div class="control-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="show_lattice_points" name="show_lattice_points" checked>
+                                <label for="show_lattice_points">Show Lattice Points</label>
+                            </div>
+                        </div>
+                        
+                        <div class="control-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="show_arrows" name="show_arrows">
+                                <label for="show_arrows">Show Direction Arrows</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="control-group" style="grid-column: 1 / -1;">
+                    <button type="submit">Generate Lattice</button>
+                </div>
+            </div>
+        </form>
+        
+        <div id="plot">
+            <div class="loading">Click "Generate Lattice" to create your visualization</div>
+        </div>
     </div>
 
-    <div id="lattice-graph"></div>
-
     <script>
-        async function generateLattice() {
-            const nPoints = document.getElementById('n_points').value;
-            const mPoints = document.getElementById('m_points').value;
-
-            const formData = new FormData();
-            formData.append('n_points', nPoints);
-            formData.append('m_points', mPoints);
-
-            try {
-                const response = await fetch('/generate_lattice', {
-                    method: 'POST',
-                    body: formData
-                });
-                const graphData = await response.json();
-                if (response.ok) {
-                    Plotly.newPlot('lattice-graph', graphData);
-                } else {
-                    alert(graphData.error);
-                }
-            } catch (error) {
-                console.error('Error generating lattice:', error);
-                alert('Failed to generate lattice. Please check console for details.');
+        // Toggle 3D controls visibility
+        document.getElementById('viz_mode').addEventListener('change', function() {
+            const threeDControls = document.getElementById('three-d-controls');
+            if (this.value === '3d') {
+                threeDControls.classList.add('active');
+            } else {
+                threeDControls.classList.remove('active');
             }
-        }
+        });
 
-        // Generate lattice on initial load
-        generateLattice();
+        // Handle form submission
+        document.getElementById('lattice-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.style.display = 'none';
+            
+            const formData = new FormData(this);
+            
+            // Handle checkbox values
+            formData.set('show_lattice_points', document.getElementById('show_lattice_points').checked ? 'true' : 'false');
+            formData.set('show_arrows', document.getElementById('show_arrows').checked ? 'true' : 'false');
+            
+            document.getElementById('plot').innerHTML = '<div class="loading">Generating lattice...</div>';
+            
+            fetch('/generate_lattice', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => Promise.reject(err));
+                }
+                return response.json();
+            })
+            .then(data => {
+                const plotDiv = document.getElementById('plot');
+                plotDiv.innerHTML = '';
+                
+                Plotly.newPlot('plot', data.data, data.layout, {
+                    responsive: true,
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: ['pan2d', 'select2d', 'lasso2d', 'autoScale2d'],
+                    displaylogo: false
+                });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('plot').innerHTML = '<div class="loading">Error generating lattice</div>';
+                
+                if (error.error) {
+                    errorDiv.textContent = error.error;
+                    errorDiv.style.display = 'block';
+                } else {
+                    errorDiv.textContent = 'An unexpected error occurred. Please try again.';
+                    errorDiv.style.display = 'block';
+                }
+            });
+        });
+
+        // Generate initial lattice
+        document.getElementById('lattice-form').dispatchEvent(new Event('submit'));
     </script>
 </body>
 </html>
