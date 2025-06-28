@@ -116,6 +116,7 @@ def visualize_lattice(df, a, dim1_points):
 
     # Update title to reflect the added hexagons and arrows
     fig.update_layout(title="Hexagonal Lattice Visualization with Hexagons and X-direction Arrows")
+    return fig
     
 def visualize_lattice_3d_simple(df, a, dim1_points, wall_height=1.0, show_lattice_points=True, show_arrows=False):
     """
@@ -271,6 +272,10 @@ def create_hexagon_wall_mesh(hex_x, hex_y, wall_height=1.0, base_z=0.0):
     """
     n_vertices = len(hex_x)
     
+    # Ensure we have valid vertices
+    if n_vertices < 3:
+        return None, None
+    
     # Create vertices: bottom hexagon + top hexagon
     vertices = []
     
@@ -301,6 +306,7 @@ def create_hexagon_wall_mesh(hex_x, hex_y, wall_height=1.0, base_z=0.0):
 def visualize_lattice_3d(df, a, dim1_points, wall_height=1.0, show_lattice_points=True, show_arrows=False):
     """
     Visualizes the hexagonal lattice as a 3D structure with extruded hexagonal walls.
+    Fixed version that handles null data issues.
 
     Args:
         df (pandas.DataFrame): DataFrame containing 'x', 'y' coordinates and 'label'.
@@ -315,153 +321,151 @@ def visualize_lattice_3d(df, a, dim1_points, wall_height=1.0, show_lattice_point
     """
     fig = go.Figure()
     
+    # Input validation
+    if df is None or len(df) == 0:
+        print("Error: DataFrame is empty or None")
+        return fig
+    
     hexagon_side_length = a / np.sqrt(3)
     
     # Debug: Print some information
     print(f"Processing {len(df)} hexagons with side length {hexagon_side_length}")
     print(f"Wall height: {wall_height}")
     
-    # Add hexagonal walls for each lattice point
+    # Add wireframe edges instead of mesh (more reliable)
     for index, row in df.iterrows():
-        center_x = row['x']
-        center_y = row['y']
-        
-        # Get hexagon vertices
-        hex_x, hex_y = create_hexagon_vertices(center_x, center_y, hexagon_side_length)
-        
-        # Create 3D wall mesh
-        vertices, faces = create_hexagon_wall_mesh(hex_x, hex_y, wall_height)
-        
-        # Debug: Print mesh info for first hexagon
-        if index == 0:
-            print(f"First hexagon vertices shape: {vertices.shape}")
-            print(f"Number of faces: {len(faces)}")
-            print(f"Sample vertices: {vertices[:3]}")
-        
-        # Add the mesh to the plot with more explicit parameters
-        fig.add_trace(go.Mesh3d(
-            x=vertices[:, 0],
-            y=vertices[:, 1],
-            z=vertices[:, 2],
-            i=[face[0] for face in faces],
-            j=[face[1] for face in faces],
-            k=[face[2] for face in faces],
-            color='red',
-            opacity=0.8,
-            lighting=dict(ambient=0.4, diffuse=0.8, specular=0.2),
-            lightposition=dict(x=100, y=200, z=0),
-            name=f'Hexagon {row["label"]}',
-            showlegend=False,
-            flatshading=False,
-            alphahull=0
-        ))
+        try:
+            center_x = row['x']
+            center_y = row['y']
+            
+            # Get hexagon vertices
+            hex_x, hex_y = create_hexagon_vertices(center_x, center_y, hexagon_side_length)
+            
+            # Validate vertices
+            if len(hex_x) == 0 or len(hex_y) == 0:
+                print(f"Warning: Invalid vertices for hexagon {index}")
+                continue
+            
+            # Add wireframe edges for better visibility and reliability
+            for i in range(len(hex_x)):
+                next_i = (i + 1) % len(hex_x)
+                
+                # Vertical edges
+                fig.add_trace(go.Scatter3d(
+                    x=[hex_x[i], hex_x[i]],
+                    y=[hex_y[i], hex_y[i]],
+                    z=[0, wall_height],
+                    mode='lines',
+                    line=dict(color='darkred', width=4),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+                
+                # Bottom edges
+                fig.add_trace(go.Scatter3d(
+                    x=[hex_x[i], hex_x[next_i]],
+                    y=[hex_y[i], hex_y[next_i]],
+                    z=[0, 0],
+                    mode='lines',
+                    line=dict(color='red', width=4),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+                
+                # Top edges
+                fig.add_trace(go.Scatter3d(
+                    x=[hex_x[i], hex_x[next_i]],
+                    y=[hex_y[i], hex_y[next_i]],
+                    z=[wall_height, wall_height],
+                    mode='lines',
+                    line=dict(color='red', width=4),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+                
+        except Exception as e:
+            print(f"Error processing hexagon {index}: {e}")
+            continue
     
-    # Alternative: Add wireframe edges to make walls more visible
-    for index, row in df.iterrows():
-        center_x = row['x']
-        center_y = row['y']
-        
-        # Get hexagon vertices
-        hex_x, hex_y = create_hexagon_vertices(center_x, center_y, hexagon_side_length)
-        
-        # Add wireframe edges for better visibility
-        for i in range(len(hex_x)):
-            next_i = (i + 1) % len(hex_x)
-            
-            # Vertical edges
-            fig.add_trace(go.Scatter3d(
-                x=[hex_x[i], hex_x[i]],
-                y=[hex_y[i], hex_y[i]],
-                z=[0, wall_height],
-                mode='lines',
-                line=dict(color='darkred', width=3),
-                showlegend=False,
-                hoverinfo='skip'
-            ))
-            
-            # Bottom edges
-            fig.add_trace(go.Scatter3d(
-                x=[hex_x[i], hex_x[next_i]],
-                y=[hex_y[i], hex_y[next_i]],
-                z=[0, 0],
-                mode='lines',
-                line=dict(color='darkred', width=3),
-                showlegend=False,
-                hoverinfo='skip'
-            ))
-            
-            # Top edges
-            fig.add_trace(go.Scatter3d(
-                x=[hex_x[i], hex_x[next_i]],
-                y=[hex_y[i], hex_y[next_i]],
-                z=[wall_height, wall_height],
-                mode='lines',
-                line=dict(color='darkred', width=3),
-                showlegend=False,
-                hoverinfo='skip'
-            ))
-    
-    # Add a ground plane for reference
+    # Add a simple ground plane for reference using Scatter3d
     if len(df) > 0:
-        x_min, x_max = df['x'].min() - a, df['x'].max() + a
-        y_min, y_max = df['y'].min() - a, df['y'].max() + a
-        
-        fig.add_trace(go.Mesh3d(
-            x=[x_min, x_max, x_max, x_min],
-            y=[y_min, y_min, y_max, y_max],
-            z=[0, 0, 0, 0],
-            i=[0, 1],
-            j=[1, 2],
-            k=[2, 3],
-            color='lightgray',
-            opacity=0.3,
-            name='Ground',
-            showlegend=False
-        ))
+        try:
+            x_min, x_max = df['x'].min() - a, df['x'].max() + a
+            y_min, y_max = df['y'].min() - a, df['y'].max() + a
+            
+            # Create a simple grid for ground reference
+            ground_x, ground_y = np.meshgrid(
+                np.linspace(x_min, x_max, 10),
+                np.linspace(y_min, y_max, 10)
+            )
+            
+            fig.add_trace(go.Scatter3d(
+                x=ground_x.flatten(),
+                y=ground_y.flatten(),
+                z=np.zeros_like(ground_x.flatten()),
+                mode='markers',
+                marker=dict(size=2, color='lightgray', opacity=0.3),
+                name='Ground',
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+        except Exception as e:
+            print(f"Error creating ground plane: {e}")
     
     # Optionally add lattice points as markers
     if show_lattice_points:
-        fig.add_trace(go.Scatter3d(
-            x=df['x'].tolist(),
-            y=df['y'].tolist(),
-            z=[wall_height/2] * len(df),  # Place points at mid-height
-            mode='markers+text',
-            text=df['label'],
-            textposition="top center",
-            marker=dict(size=5, color='blue'),
-            name='Lattice Points'
-        ))
+        try:
+            fig.add_trace(go.Scatter3d(
+                x=df['x'].tolist(),
+                y=df['y'].tolist(),
+                z=[wall_height/2] * len(df),  # Place points at mid-height
+                mode='markers+text',
+                text=df['label'].tolist(),
+                textposition="top center",
+                marker=dict(size=6, color='blue'),
+                name='Lattice Points'
+            ))
+        except Exception as e:
+            print(f"Error adding lattice points: {e}")
     
     # Optionally add directional arrows (simplified for 3D)
     if show_arrows:
-        for index, row in df.iterrows():
-            x_steps = int(row['label'].split(',')[0].strip('('))
-            y_steps = int(row['label'].split(',')[1].strip(')'))
-            
-            # Draw arrow in positive x direction
-            if x_steps < dim1_points - 1:
-                start_x = row['x']
-                start_y = row['y']
-                arrow_z = wall_height / 2
-                
-                # The next point in the x-direction is (x_steps + 1, y_steps)
-                end_x = a * (x_steps + 1) + a * (-0.5) * y_steps
-                end_y = a * (np.sqrt(3)/2) * y_steps
-                
-                # Add arrow as a line
-                fig.add_trace(go.Scatter3d(
-                    x=[start_x, end_x],
-                    y=[start_y, end_y],
-                    z=[arrow_z, arrow_z],
-                    mode='lines',
-                    line=dict(color='green', width=6),
-                    name=f'Arrow {row["label"]}',
-                    showlegend=False
-                ))
+        try:
+            for index, row in df.iterrows():
+                try:
+                    label_parts = row['label'].strip('()').split(',')
+                    x_steps = int(label_parts[0])
+                    y_steps = int(label_parts[1])
+                    
+                    # Draw arrow in positive x direction
+                    if x_steps < dim1_points - 1:
+                        start_x = row['x']
+                        start_y = row['y']
+                        arrow_z = wall_height / 2
+                        
+                        # The next point in the x-direction is (x_steps + 1, y_steps)
+                        end_x = a * (x_steps + 1) + a * (-0.5) * y_steps
+                        end_y = a * (np.sqrt(3)/2) * y_steps
+                        
+                        # Add arrow as a line
+                        fig.add_trace(go.Scatter3d(
+                            x=[start_x, end_x],
+                            y=[start_y, end_y],
+                            z=[arrow_z, arrow_z],
+                            mode='lines',
+                            line=dict(color='green', width=6),
+                            name=f'Arrow {row["label"]}',
+                            showlegend=False
+                        ))
+                except Exception as e:
+                    print(f"Error processing arrow for row {index}: {e}")
+                    continue
+        except Exception as e:
+            print(f"Error adding arrows: {e}")
     
     # Update layout for 3D visualization
     fig.update_layout(
-        title="3D Hexagonal Lattice with Extruded Walls",
+        title="3D Hexagonal Lattice with Wall Structure (Wireframe)",
         scene=dict(
             xaxis_title="X Coordinate",
             yaxis_title="Y Coordinate",
@@ -478,3 +482,36 @@ def visualize_lattice_3d(df, a, dim1_points, wall_height=1.0, show_lattice_point
     )
     
     return fig
+
+# Example usage and test function
+def test_lattice_visualization():
+    """
+    Test function to demonstrate the lattice visualization
+    """
+    try:
+        # Generate a small lattice for testing
+        df = generate_hexagonal_lattice(a=1.0, dim1_points=3, dim2_points=3)
+        print(f"Generated lattice with {len(df)} points")
+        print(df.head())
+        
+        # Test 2D visualization
+        fig_2d = visualize_lattice(df, a=1.0, dim1_points=3)
+        print("2D visualization created successfully")
+        
+        # Test 3D visualization (simple version)
+        fig_3d_simple = visualize_lattice_3d_simple(df, a=1.0, dim1_points=3, wall_height=1.0)
+        print("3D simple visualization created successfully")
+        
+        # Test 3D visualization (fixed version)
+        fig_3d = visualize_lattice_3d(df, a=1.0, dim1_points=3, wall_height=1.0, 
+                                      show_lattice_points=True, show_arrows=True)
+        print("3D visualization created successfully")
+        
+        return fig_2d, fig_3d_simple, fig_3d
+        
+    except Exception as e:
+        print(f"Error in test function: {e}")
+        return None, None, None
+
+if __name__ == "__main__":
+    test_lattice_visualization()
