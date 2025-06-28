@@ -117,6 +117,126 @@ def visualize_lattice(df, a, dim1_points):
     # Update title to reflect the added hexagons and arrows
     fig.update_layout(title="Hexagonal Lattice Visualization with Hexagons and X-direction Arrows")
     
+def visualize_lattice_3d_simple(df, a, dim1_points, wall_height=1.0, show_lattice_points=True, show_arrows=False):
+    """
+    Alternative 3D visualization using simple cylinder walls (more reliable rendering).
+    """
+    fig = go.Figure()
+    
+    hexagon_side_length = a / np.sqrt(3)
+    
+    # Add cylindrical walls for each hexagon edge
+    for index, row in df.iterrows():
+        center_x = row['x']
+        center_y = row['y']
+        
+        # Get hexagon vertices
+        hex_x, hex_y = create_hexagon_vertices(center_x, center_y, hexagon_side_length)
+        
+        # Create walls as cylinders along each edge
+        for i in range(len(hex_x)):
+            next_i = (i + 1) % len(hex_x)
+            
+            # Calculate midpoint and direction for wall segment
+            mid_x = (hex_x[i] + hex_x[next_i]) / 2
+            mid_y = (hex_y[i] + hex_y[next_i]) / 2
+            
+            # Create a thick line (wall) between vertices
+            fig.add_trace(go.Scatter3d(
+                x=[hex_x[i], hex_x[next_i]],
+                y=[hex_y[i], hex_y[next_i]],
+                z=[wall_height/2, wall_height/2],
+                mode='lines',
+                line=dict(color='red', width=15),  # Very thick line to simulate wall
+                name=f'Wall {index}-{i}',
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+            
+            # Add vertical pillars at corners
+            fig.add_trace(go.Scatter3d(
+                x=[hex_x[i], hex_x[i]],
+                y=[hex_y[i], hex_y[i]], 
+                z=[0, wall_height],
+                mode='lines',
+                line=dict(color='darkred', width=8),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+    
+    # Add ground reference
+    if len(df) > 0:
+        x_min, x_max = df['x'].min() - a, df['x'].max() + a
+        y_min, y_max = df['y'].min() - a, df['y'].max() + a
+        
+        # Ground plane as scatter points
+        ground_x, ground_y = np.meshgrid(
+            np.linspace(x_min, x_max, 20),
+            np.linspace(y_min, y_max, 20)
+        )
+        fig.add_trace(go.Scatter3d(
+            x=ground_x.flatten(),
+            y=ground_y.flatten(),
+            z=np.zeros_like(ground_x.flatten()),
+            mode='markers',
+            marker=dict(size=1, color='lightgray', opacity=0.3),
+            showlegend=False,
+            hoverinfo='skip'
+        ))
+    
+    # Add lattice points
+    if show_lattice_points:
+        fig.add_trace(go.Scatter3d(
+            x=df['x'].tolist(),
+            y=df['y'].tolist(),
+            z=[wall_height/2] * len(df),
+            mode='markers+text',
+            text=df['label'],
+            textposition="top center",
+            marker=dict(size=8, color='blue'),
+            name='Lattice Points'
+        ))
+    
+    # Add arrows
+    if show_arrows:
+        for index, row in df.iterrows():
+            x_steps = int(row['label'].split(',')[0].strip('('))
+            y_steps = int(row['label'].split(',')[1].strip(')'))
+            
+            if x_steps < dim1_points - 1:
+                start_x = row['x']
+                start_y = row['y']
+                arrow_z = wall_height / 2
+                
+                end_x = a * (x_steps + 1) + a * (-0.5) * y_steps
+                end_y = a * (np.sqrt(3)/2) * y_steps
+                
+                fig.add_trace(go.Scatter3d(
+                    x=[start_x, end_x],
+                    y=[start_y, end_y],
+                    z=[arrow_z, arrow_z],
+                    mode='lines',
+                    line=dict(color='green', width=8),
+                    name=f'Arrow {row["label"]}',
+                    showlegend=False
+                ))
+    
+    # Update layout
+    fig.update_layout(
+        title="3D Hexagonal Lattice with Wall Structure",
+        scene=dict(
+            xaxis_title="X Coordinate",
+            yaxis_title="Y Coordinate", 
+            zaxis_title="Z Coordinate (Height)",
+            aspectmode='data',
+            camera=dict(eye=dict(x=1.5, y=1.5, z=1.5))
+        ),
+        width=900,
+        height=800,
+        showlegend=False,
+        font=dict(size=10)
+    )
+    
     return fig
 
 def create_hexagon_vertices(center_x, center_y, hexagon_side_length):
@@ -197,6 +317,10 @@ def visualize_lattice_3d(df, a, dim1_points, wall_height=1.0, show_lattice_point
     
     hexagon_side_length = a / np.sqrt(3)
     
+    # Debug: Print some information
+    print(f"Processing {len(df)} hexagons with side length {hexagon_side_length}")
+    print(f"Wall height: {wall_height}")
+    
     # Add hexagonal walls for each lattice point
     for index, row in df.iterrows():
         center_x = row['x']
@@ -208,7 +332,13 @@ def visualize_lattice_3d(df, a, dim1_points, wall_height=1.0, show_lattice_point
         # Create 3D wall mesh
         vertices, faces = create_hexagon_wall_mesh(hex_x, hex_y, wall_height)
         
-        # Add the mesh to the plot
+        # Debug: Print mesh info for first hexagon
+        if index == 0:
+            print(f"First hexagon vertices shape: {vertices.shape}")
+            print(f"Number of faces: {len(faces)}")
+            print(f"Sample vertices: {vertices[:3]}")
+        
+        # Add the mesh to the plot with more explicit parameters
         fig.add_trace(go.Mesh3d(
             x=vertices[:, 0],
             y=vertices[:, 1],
@@ -217,8 +347,75 @@ def visualize_lattice_3d(df, a, dim1_points, wall_height=1.0, show_lattice_point
             j=[face[1] for face in faces],
             k=[face[2] for face in faces],
             color='red',
-            opacity=0.7,
+            opacity=0.8,
+            lighting=dict(ambient=0.4, diffuse=0.8, specular=0.2),
+            lightposition=dict(x=100, y=200, z=0),
             name=f'Hexagon {row["label"]}',
+            showlegend=False,
+            flatshading=False,
+            alphahull=0
+        ))
+    
+    # Alternative: Add wireframe edges to make walls more visible
+    for index, row in df.iterrows():
+        center_x = row['x']
+        center_y = row['y']
+        
+        # Get hexagon vertices
+        hex_x, hex_y = create_hexagon_vertices(center_x, center_y, hexagon_side_length)
+        
+        # Add wireframe edges for better visibility
+        for i in range(len(hex_x)):
+            next_i = (i + 1) % len(hex_x)
+            
+            # Vertical edges
+            fig.add_trace(go.Scatter3d(
+                x=[hex_x[i], hex_x[i]],
+                y=[hex_y[i], hex_y[i]],
+                z=[0, wall_height],
+                mode='lines',
+                line=dict(color='darkred', width=3),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+            
+            # Bottom edges
+            fig.add_trace(go.Scatter3d(
+                x=[hex_x[i], hex_x[next_i]],
+                y=[hex_y[i], hex_y[next_i]],
+                z=[0, 0],
+                mode='lines',
+                line=dict(color='darkred', width=3),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+            
+            # Top edges
+            fig.add_trace(go.Scatter3d(
+                x=[hex_x[i], hex_x[next_i]],
+                y=[hex_y[i], hex_y[next_i]],
+                z=[wall_height, wall_height],
+                mode='lines',
+                line=dict(color='darkred', width=3),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+    
+    # Add a ground plane for reference
+    if len(df) > 0:
+        x_min, x_max = df['x'].min() - a, df['x'].max() + a
+        y_min, y_max = df['y'].min() - a, df['y'].max() + a
+        
+        fig.add_trace(go.Mesh3d(
+            x=[x_min, x_max, x_max, x_min],
+            y=[y_min, y_min, y_max, y_max],
+            z=[0, 0, 0, 0],
+            i=[0, 1],
+            j=[1, 2],
+            k=[2, 3],
+            color='lightgray',
+            opacity=0.3,
+            name='Ground',
             showlegend=False
         ))
     

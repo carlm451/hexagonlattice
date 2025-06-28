@@ -2,7 +2,7 @@ from flask import Flask, render_template, request
 import plotly
 import plotly.graph_objects as go
 import json
-from hexagonal_lattice_generator import generate_hexagonal_lattice, visualize_lattice, visualize_lattice_3d
+from hexagonal_lattice_generator import generate_hexagonal_lattice, visualize_lattice, visualize_lattice_3d, visualize_lattice_3d_simple
 
 app = Flask(__name__)
 
@@ -32,14 +32,26 @@ def generate_lattice_data():
     
     # Choose visualization based on mode
     if viz_mode == '3d':
-        fig = visualize_lattice_3d(
-            lattice_df, 
-            a_val, 
-            n_points, 
-            wall_height=wall_height,
-            show_lattice_points=show_lattice_points,
-            show_arrows=show_arrows
-        )
+        # Try the mesh-based version first, fallback to simple version
+        try:
+            fig = visualize_lattice_3d(
+                lattice_df, 
+                a_val, 
+                n_points, 
+                wall_height=wall_height,
+                show_lattice_points=show_lattice_points,
+                show_arrows=show_arrows
+            )
+        except Exception as e:
+            print(f"Mesh visualization failed: {e}, using simple version")
+            fig = visualize_lattice_3d_simple(
+                lattice_df, 
+                a_val, 
+                n_points, 
+                wall_height=wall_height,
+                show_lattice_points=show_lattice_points,
+                show_arrows=show_arrows
+            )
     else:
         fig = visualize_lattice(lattice_df, a_val, n_points)
 
