@@ -133,46 +133,34 @@ python app.py
 
 ```
 
-🚀 Operating Manual
+---
+
+## 🚀 Operating Manual
+
 Once connected to the lattice core:
 
-Input values for 
-𝑁
-N, 
-𝑀
-M, then initiate the HexMesh Compiler.
+- Input values for \( N \), \( M \), then initiate the **HexMesh Compiler**.
 
-Gestural interface supports:
+- Gestural interface supports:
+  - **Rotation**: left click + drag  
+  - **Zoom**: scroll wheel  
+  - **Translation**: right click + drag
 
-Rotation: left click + drag
+- All transformations are tracked via the **Lattice Affine History Tensor**
 
-Zoom: scroll wheel
+---
 
-Translation: right click + drag
+## 📁 Directory Topology
 
-All transformations are tracked via the Lattice Affine History Tensor
+- `app.py` → Core Flask daemon  
+- `hexagonal_lattice_generator.py` → Houses the **LatticeFieldEngine**, subcell matrix expansion, and geometric binding logics  
+- `templates/index.html` → Neon interface shell using **quantum webgl shaders**  
+- `requirements.txt` → Dependency graph for instantiation  
+- `venv/` → Virtual Python environment generated during boot  
 
-📁 Directory Topology
-app.py → Core Flask daemon
+---
 
-hexagonal_lattice_generator.py → Houses the LatticeFieldEngine, subcell matrix expansion, and geometric binding logics
+## 📡 Future Work & Speculative Extensions
 
-templates/index.html → Neon interface shell using quantum webgl shaders
-
-requirements.txt → Dependency graph for instantiation
-
-venv/ → Virtual Python environment generated during boot
-
-📡 Future Work & Speculative Extensions
-Support for QuBitMesh™ lattice solvers (GPU-accelerated, entanglement-aware)
-
-Extension to Multi-Brane Hyperlattices using Z-Brane Overlays
-
-Export to .dimfield, .lattx, and Quantum Voxel Field formats
-
-Edge computation in Entangled Spin Topologies (Ono & Ibrahim, 2192)
-
-Field coupling to external graviton backscatter arrays
-
-Phase-align your core. Collapse the observer function. Enter the lattice.
-You are now embedded in the hexafield.
+- Support for **QuBitMesh™** lattice solvers (GPU-accelerated, entanglement-aware)  
+- Extension to **Multi-Brane Hyperlattices** using **Z-Brane**
