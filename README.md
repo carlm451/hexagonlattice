@@ -92,13 +92,35 @@ $$
 
 With effective action:
 
-$$
+$
 S[\phi] = \int d^3x \left( \frac{1}{2} \partial_\mu \phi \, \partial^\mu \phi + \frac{\lambda}{4!} \phi^4 \right)
-$$
+$
+
+---
+## \ud83c\udfa8 Aperiodic Tiling and Chromatic Propagation
+
+> ![Aperiodic Coloring Demo](images/hexdemo2.png)
+
+The chromatic state of each hexagonal cell is not random; it is determined by a deterministic, non-periodic inflation algorithm rooted in the principles of quasicrystalline structures and symbolic dynamics. This approach avoids simple periodic tiling, resulting in a complex, self-similar pattern that never repeats, analogous to Penrose tiling.
+
+The core of the algorithm is a **Breadth-First Search (BFS)** propagation originating from a central seed cell, \(C_0\). This seed is assigned an initial color index of 0 from a palette of \(k=6\) chromatic states. The coloring rule is defined by a recursive substitution or "inflation" process:
+
+1.  A cell at axial coordinate \((q, r)\) with color \(c_i\) is dequeued.
+2.  It propagates its chromatic influence to its six neighbors. The color assigned to a neighbor is determined by its directional relationship to the parent cell.
+3.  The propagation rule is given by:
+    $
+c_{\text{neighbor}} = (c_i + \delta_j) \pmod k
+$
+    where \(\delta_j\) is a color offset determined by the neighbor's index \(j \in \{0, 1, \dots, 5\}\). To break symmetry and induce aperiodicity, we use two alternating offsets:
+    -   Neighbors at even indices get color \((c_i + 1) \pmod 6\).
+    -   Neighbors at odd indices get color \((c_i + 2) \pmod 6\).
+
+This simple, local rule, when applied globally, generates a complex emergent structure. The resulting color map, \( \mathcal{C}(q, r) \), lacks translational symmetry, ensuring that no two regions of the lattice are exactly alike, yet the overall structure maintains a high degree of long-range order. This is a key characteristic of systems that are ordered but not periodic.
 
 ---
 
-## 🔧 System Stack
+## \ud83d\udd27 System Stack
+
 
 - **Language Core**: Python 3.10 (Flask 1.1.2)  
 - **Frontend Engine**: HTML, CSS, Vanilla JS, Plotly.js  
