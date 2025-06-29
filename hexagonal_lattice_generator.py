@@ -265,41 +265,39 @@ def visualize_lattice_3d(df: pd.DataFrame, a: float, dim1_points: int,
     return fig
 
 def _add_hexagon_walls_mesh_3d(fig, df, lattice, wall_height):
-    """DEBUG: Adds walls to all hexagons in the first row (y_step == 0)."""
+    """Adds vertical walls for all hexagons, rendering one trace per wall for maximum stability."""
     
-    # 1. Define a palette of colors to cycle through
-    colors = ['lime', 'cyan', 'magenta', 'yellow', 'orange', 'white', 'blue', 'red']
-    
-    # 2. Filter the DataFrame to get only the first row of hexagons
-    first_row_df = df[df['y_step'] == 0].copy()
-    
-    if first_row_df.empty:
+    if df.empty:
         return
 
-    # 3. Loop through each hexagon in the first row and draw its walls
-    for i, (index, hex_data) in enumerate(first_row_df.iterrows()):
+    # Loop through each hexagon in the provided DataFrame
+    for i, (index, hex_data) in enumerate(df.iterrows()):
         center_x = hex_data['x']
         center_y = hex_data['y']
         
+        # Get the 6 corner points for the base of the current hexagon
         hex_corners_x = center_x + lattice.hexagon_side_length * lattice.cos_angles
         hex_corners_y = center_y + lattice.hexagon_side_length * lattice.sin_angles
-        
-        # Assign a color from the palette
-        color = colors[i % len(colors)]
         
         # Loop through the 6 sides of this hexagon to create a wall for each
         for v in range(6):
             p1_idx = v
             p2_idx = (v + 1) % 6
             
+            # Define the 4 vertices for this specific rectangular wall
             x_coords = [hex_corners_x[p1_idx], hex_corners_x[p2_idx], hex_corners_x[p2_idx], hex_corners_x[p1_idx]]
             y_coords = [hex_corners_y[p1_idx], hex_corners_y[p2_idx], hex_corners_y[p2_idx], hex_corners_y[p1_idx]]
             z_coords = [0, 0, wall_height, wall_height]
 
+            # Add a new trace for this single wall.
+            # The vertex indices for a single trace with 4 points are always [0, 1, 2, 3].
             fig.add_trace(go.Mesh3d(
                 x=x_coords, y=y_coords, z=z_coords,
                 i=[0, 0], j=[1, 2], k=[2, 3],
-                color=color, opacity=1.0, name=f'Wall {i}-{v}'
+                color='red', 
+                opacity=0.5,
+                showlegend=False,
+                hoverinfo='skip'
             ))
 
 # Helper functions for 3D visualization
