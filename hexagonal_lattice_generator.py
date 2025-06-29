@@ -5,6 +5,8 @@ import pandas as pd
 from typing import Tuple, Optional, List
 import warnings
 from joblib import Parallel, delayed
+from collections import deque
+
 
 
 class OptimizedHexLattice:
@@ -262,14 +264,14 @@ def visualize_lattice_3d(df: pd.DataFrame, a: float, dim1_points: int,
     
     return fig
 
-def _calculate_wall_for_hexagon(hex_data, lattice, wall_height):
-    """Calculates the vertices and faces for a single hexagon's walls."""
+def _calculate_wall_geometry_for_hexagon(hex_data, lattice, wall_height):
+    """Calculates the vertices and faces for a single hexagon's walls. Pure function for parallelization."""
     center_x, center_y = hex_data['x'], hex_data['y']
     
     hex_corners_x = center_x + lattice.hexagon_side_length * lattice.cos_angles
     hex_corners_y = center_y + lattice.hexagon_side_length * lattice.sin_angles
     
-    # Vertices for the 6 walls (12 points total)
+    # Vertices for the 6 walls (12 points total: 6 bottom, 6 top)
     x_coords = np.concatenate([hex_corners_x, hex_corners_x])
     y_coords = np.concatenate([hex_corners_y, hex_corners_y])
     z_coords = np.concatenate([np.zeros(6), np.full(6, wall_height)])
@@ -281,44 +283,68 @@ def _calculate_wall_for_hexagon(hex_data, lattice, wall_height):
         p_bl, p_br = v, v_next
         p_tl, p_tr = v + 6, v_next + 6
         
-        i_faces.extend([p_bl, p_bl])
-        j_faces.extend([p_br, p_tr])
-        k_faces.extend([p_tr, p_tl])
+        # First triangle
+        i_faces.append(p_bl)
+        j_faces.append(p_br)
+        k_faces.append(p_tr)
+        
+        # Second triangle
+        i_faces.append(p_bl)
+        j_faces.append(p_tr)
+        k_faces.append(p_tl)
         
     return x_coords, y_coords, z_coords, i_faces, j_faces, k_faces
 
 def _add_hexagon_walls_mesh_3d(fig, df, lattice, wall_height):
-    """Adds vertical walls for all hexagons using a single, parallelized mesh."""
+    """Adds vertical walls for all hexagons using a single, parallelized, multi-color mesh."""
     if df.empty:
         return
 
-    # Use joblib to calculate wall data for all hexagons in parallel
+    # 1. Generate the color map for the entire lattice
+    n_points = df['x_step'].max() + 1
+    m_points = df['y_step'].max() + 1
+    color_map = _generate_aperiodic_color_map(n_points, m_points)
+    palette = ['#FF5733', '#33FF57', '#3357FF', '#FF33A1', '#A133FF', '#33FFA1']
+
+    # 2. Use joblib to calculate wall geometry for all hexagons in parallel
     results = Parallel(n_jobs=-1)(
-        delayed(_calculate_wall_for_hexagon)(row, lattice, wall_height) for _, row in df.iterrows()
+        delayed(_calculate_wall_geometry_for_hexagon)(row, lattice, wall_height) for _, row in df.iterrows()
     )
 
-    # Unpack and aggregate the results
+    # 3. Unpack and aggregate the results into a single mesh definition
     all_x, all_y, all_z = [], [], []
     all_i, all_j, all_k = [], [], []
+    all_face_colors = []
     vertex_offset = 0
 
-    for x, y, z, i, j, k in results:
+    for i, (x, y, z, i_f, j_f, k_f) in enumerate(results):
+        # Append vertices
         all_x.extend(x)
         all_y.extend(y)
         all_z.extend(z)
         
-        # Offset the face indices for the global mesh
-        all_i.extend([idx + vertex_offset for idx in i])
-        all_j.extend([idx + vertex_offset for idx in j])
-        all_k.extend([idx + vertex_offset for idx in k])
+        # Get color for this hexagon
+        hex_data = df.iloc[i]
+        q, r = hex_data['x_step'], hex_data['y_step']
+        color_index = color_map.get((q, r), 0)
+        color = palette[color_index]
+        
+        # There are 12 triangles (faces) per hexagon. Each needs a color.
+        all_face_colors.extend([color] * 12)
+        
+        # Offset the face indices for the global mesh and append
+        all_i.extend([idx + vertex_offset for idx in i_f])
+        all_j.extend([idx + vertex_offset for idx in j_f])
+        all_k.extend([idx + vertex_offset for idx in k_f])
         
         vertex_offset += 12 # Each hexagon adds 12 vertices
 
+    # 4. Add the single, efficient mesh trace containing all colored walls
     fig.add_trace(go.Mesh3d(
         x=all_x, y=all_y, z=all_z,
         i=all_i, j=all_j, k=all_k,
-        color='red', 
-        opacity=0.5,
+        facecolor=all_face_colors,
+        opacity=0.6,
         showlegend=False,
         hoverinfo='skip'
     ))
@@ -460,6 +486,32 @@ def get_performance_info(dim1_points: int, dim2_points: int) -> dict:
         'performance_level': performance_level,
         'recommendation': recommendation
     }
+
+def _generate_aperiodic_color_map(n_points, m_points):
+    """Generates a color map using aperiodic inflation rules."""
+    num_colors = 6
+    directions = [(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)]
+    color_map = {}
+
+    seed = (n_points // 2, m_points // 2)
+    color_map[seed] = 0
+
+    queue = deque([seed])
+    visited = {seed}
+
+    while queue:
+        q, r = queue.popleft()
+        current_color = color_map.get((q, r), 0)
+        next_colors = [(current_color + 1) % num_colors, (current_color + 2) % num_colors]
+
+        for i, (dq, dr) in enumerate(directions):
+            nq, nr = q + dq, r + dr
+            if 0 <= nq < n_points and 0 <= nr < m_points and (nq, nr) not in visited:
+                color_map[(nq, nr)] = next_colors[i % 2]
+                visited.add((nq, nr))
+                queue.append((nq, nr))
+    
+    return color_map
 
 if __name__ == "__main__":
     # Test compatibility
