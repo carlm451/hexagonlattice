@@ -4,6 +4,8 @@ import plotly.graph_objects as go
 import pandas as pd
 from typing import Tuple, Optional, List
 import warnings
+from joblib import Parallel, delayed
+
 
 class OptimizedHexLattice:
     """
@@ -167,8 +169,6 @@ def visualize_lattice(df: pd.DataFrame, a: float, dim1_points: int) -> go.Figure
         yaxis_title="Cartesian Y Coordinate",
         hovermode="closest",
         showlegend=n_points < 500,
-        width=900,
-        height=800,
         yaxis=dict(scaleanchor="x", scaleratio=1),
         font=dict(size=max(8, min(12, 150 // np.sqrt(n_points))))
     )
@@ -233,7 +233,7 @@ def visualize_lattice_3d(df: pd.DataFrame, a: float, dim1_points: int,
             ))
     
     # Add 3D hexagon structures
-    if show_walls and detail_level != 'low':
+    if show_walls:
         _add_hexagon_walls_mesh_3d(fig, df, _global_lattice, wall_height)
     
     if detail_level == 'high':
@@ -256,49 +256,72 @@ def visualize_lattice_3d(df: pd.DataFrame, a: float, dim1_points: int,
             aspectmode='data',
             camera=dict(eye=dict(x=1.5, y=1.5, z=1.2))
         ),
-        width=900,
-        height=800,
         showlegend=n_points < 500,
         font=dict(size=max(8, min(12, 150 // np.sqrt(n_points))))
     )
     
     return fig
 
-def _add_hexagon_walls_mesh_3d(fig, df, lattice, wall_height):
-    """Adds vertical walls for all hexagons, rendering one trace per wall for maximum stability."""
+def _calculate_wall_for_hexagon(hex_data, lattice, wall_height):
+    """Calculates the vertices and faces for a single hexagon's walls."""
+    center_x, center_y = hex_data['x'], hex_data['y']
     
+    hex_corners_x = center_x + lattice.hexagon_side_length * lattice.cos_angles
+    hex_corners_y = center_y + lattice.hexagon_side_length * lattice.sin_angles
+    
+    # Vertices for the 6 walls (12 points total)
+    x_coords = np.concatenate([hex_corners_x, hex_corners_x])
+    y_coords = np.concatenate([hex_corners_y, hex_corners_y])
+    z_coords = np.concatenate([np.zeros(6), np.full(6, wall_height)])
+    
+    # Faces for the 6 walls (12 triangles total)
+    i_faces, j_faces, k_faces = [], [], []
+    for v in range(6):
+        v_next = (v + 1) % 6
+        p_bl, p_br = v, v_next
+        p_tl, p_tr = v + 6, v_next + 6
+        
+        i_faces.extend([p_bl, p_bl])
+        j_faces.extend([p_br, p_tr])
+        k_faces.extend([p_tr, p_tl])
+        
+    return x_coords, y_coords, z_coords, i_faces, j_faces, k_faces
+
+def _add_hexagon_walls_mesh_3d(fig, df, lattice, wall_height):
+    """Adds vertical walls for all hexagons using a single, parallelized mesh."""
     if df.empty:
         return
 
-    # Loop through each hexagon in the provided DataFrame
-    for i, (index, hex_data) in enumerate(df.iterrows()):
-        center_x = hex_data['x']
-        center_y = hex_data['y']
-        
-        # Get the 6 corner points for the base of the current hexagon
-        hex_corners_x = center_x + lattice.hexagon_side_length * lattice.cos_angles
-        hex_corners_y = center_y + lattice.hexagon_side_length * lattice.sin_angles
-        
-        # Loop through the 6 sides of this hexagon to create a wall for each
-        for v in range(6):
-            p1_idx = v
-            p2_idx = (v + 1) % 6
-            
-            # Define the 4 vertices for this specific rectangular wall
-            x_coords = [hex_corners_x[p1_idx], hex_corners_x[p2_idx], hex_corners_x[p2_idx], hex_corners_x[p1_idx]]
-            y_coords = [hex_corners_y[p1_idx], hex_corners_y[p2_idx], hex_corners_y[p2_idx], hex_corners_y[p1_idx]]
-            z_coords = [0, 0, wall_height, wall_height]
+    # Use joblib to calculate wall data for all hexagons in parallel
+    results = Parallel(n_jobs=-1)(
+        delayed(_calculate_wall_for_hexagon)(row, lattice, wall_height) for _, row in df.iterrows()
+    )
 
-            # Add a new trace for this single wall.
-            # The vertex indices for a single trace with 4 points are always [0, 1, 2, 3].
-            fig.add_trace(go.Mesh3d(
-                x=x_coords, y=y_coords, z=z_coords,
-                i=[0, 0], j=[1, 2], k=[2, 3],
-                color='red', 
-                opacity=0.5,
-                showlegend=False,
-                hoverinfo='skip'
-            ))
+    # Unpack and aggregate the results
+    all_x, all_y, all_z = [], [], []
+    all_i, all_j, all_k = [], [], []
+    vertex_offset = 0
+
+    for x, y, z, i, j, k in results:
+        all_x.extend(x)
+        all_y.extend(y)
+        all_z.extend(z)
+        
+        # Offset the face indices for the global mesh
+        all_i.extend([idx + vertex_offset for idx in i])
+        all_j.extend([idx + vertex_offset for idx in j])
+        all_k.extend([idx + vertex_offset for idx in k])
+        
+        vertex_offset += 12 # Each hexagon adds 12 vertices
+
+    fig.add_trace(go.Mesh3d(
+        x=all_x, y=all_y, z=all_z,
+        i=all_i, j=all_j, k=all_k,
+        color='red', 
+        opacity=0.5,
+        showlegend=False,
+        hoverinfo='skip'
+    ))
 
 # Helper functions for 3D visualization
 def _add_full_wireframes_3d(fig, df, lattice, wall_height, line_width):
