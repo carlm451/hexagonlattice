@@ -286,53 +286,6 @@ def visualize_lattice_3d(df: pd.DataFrame, a: float, dim1_points: int,
     
     return fig
 
-def visualize_lattice_3d_simple(df: pd.DataFrame, a: float, dim1_points: int, 
-                               wall_height: float = 1.0, 
-                               show_lattice_points: bool = True, 
-                               show_arrows: bool = False) -> go.Figure:
-    """
-    Simple 3D visualization for compatibility - uses minimal detail level.
-    """
-    global _global_lattice
-    if _global_lattice.a != a:
-        _global_lattice = OptimizedHexLattice(a)
-    
-    n_points = len(df)
-    dim2_points = n_points // dim1_points
-    
-    fig = go.Figure()
-    
-    # Always show lattice points in simple mode
-    if show_lattice_points:
-        fig.add_trace(go.Scatter3d(
-            x=df['x'],
-            y=df['y'],
-            z=[wall_height/2] * n_points,
-            mode='markers',
-            marker=dict(size=4, color='blue'),
-            name='Lattice Points',
-            hovertemplate='x=%{x:.2f}<br>y=%{y:.2f}<extra></extra>'
-        ))
-    
-    # Add simple outlines only
-    _add_simple_outlines_3d(fig, df, _global_lattice, wall_height, 1)
-    
-    fig.update_layout(
-        title=f"3D Hexagonal Lattice ({dim1_points}×{dim2_points}) - Simple",
-        scene=dict(
-            xaxis_title="X Coordinate",
-            yaxis_title="Y Coordinate",
-            zaxis_title="Z Coordinate (Height)",
-            aspectmode='data',
-            camera=dict(eye=dict(x=1.5, y=1.5, z=1.2))
-        ),
-        width=900,
-        height=800,
-        showlegend=True
-    )
-    
-    return fig
-
 # Helper functions for 3D visualization
 def _add_full_wireframes_3d(fig, df, lattice, wall_height, line_width):
     """Add full 3D wireframes."""

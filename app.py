@@ -2,8 +2,7 @@ from flask import Flask, render_template, request
 import plotly
 import plotly.graph_objects as go
 import json
-from hexagonal_lattice_generator import generate_hexagonal_lattice, visualize_lattice, visualize_lattice_3d, visualize_lattice_3d_simple
-
+from hexagonal_lattice_generator import generate_hexagonal_lattice, visualize_lattice, visualize_lattice_3d
 app = Flask(__name__)
 
 @app.route('/')
@@ -43,15 +42,8 @@ def generate_lattice_data():
                 show_arrows=show_arrows
             )
         except Exception as e:
-            print(f"Mesh visualization failed: {e}, using simple version")
-            fig = visualize_lattice_3d_simple(
-                lattice_df, 
-                a_val, 
-                n_points, 
-                wall_height=wall_height,
-                show_lattice_points=show_lattice_points,
-                show_arrows=show_arrows
-            )
+            raise ValueError(f"3D visualization failed: {e}")
+
     else:
         fig = visualize_lattice(lattice_df, a_val, n_points)
 
