@@ -530,13 +530,14 @@
                                     <label for="show_lattice_points">Node Visibility</label>
                                 </div>
                             </div>
-                            
                             <div class="control-group">
                                 <div class="checkbox-group">
-                                    <input type="checkbox" id="show_arrows" name="show_arrows">
-                                    <label for="show_arrows">Vector Display</label>
+                                    <input type="checkbox" id="show_walls" name="show_walls" checked>
+                                    <label for="show_walls">Show Walls</label>
                                 </div>
                             </div>
+                        </div>
+                            
                         </div>
                     </div>
                     
@@ -574,7 +575,7 @@
             
             // Handle checkbox values
             formData.set('show_lattice_points', document.getElementById('show_lattice_points').checked ? 'true' : 'false');
-            formData.set('show_arrows', document.getElementById('show_arrows').checked ? 'true' : 'false');
+            formData.set('show_walls', document.getElementById('show_walls').checked ? 'true' : 'false');
             
             document.getElementById('plot').innerHTML = '<div class="loading">Generating Quantum Matrix...</div>';
             

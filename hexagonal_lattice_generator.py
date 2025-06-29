@@ -107,7 +107,6 @@ def visualize_lattice(df: pd.DataFrame, a: float, dim1_points: int) -> go.Figure
     
     # Adaptive settings based on size
     show_labels = n_points <= 400
-    show_arrows = n_points <= 100
     
     fig = go.Figure()
     
@@ -160,26 +159,6 @@ def visualize_lattice(df: pd.DataFrame, a: float, dim1_points: int) -> go.Figure
             showlegend=False
         ))
     
-    # Add arrows for small lattices
-    if show_arrows:
-        for _, row in df.iterrows():
-            x_steps = row['x_step']
-            y_steps = row['y_step']
-            
-            if x_steps < dim1_points - 1:
-                start_x = row['x']
-                start_y = row['y']
-                end_x = a * (x_steps + 1) + a * (-0.5) * y_steps
-                end_y = a * (np.sqrt(3)/2) * y_steps
-                
-                fig.add_annotation(
-                    x=end_x, y=end_y,
-                    ax=start_x, ay=start_y,
-                    xref="x", yref="y", axref="x", ayref="y",
-                    showarrow=True, arrowhead=2, arrowsize=1,
-                    arrowwidth=1, arrowcolor="green"
-                )
-    
     # Optimized layout
     dim2_points = len(df) // dim1_points
     fig.update_layout(
@@ -196,10 +175,10 @@ def visualize_lattice(df: pd.DataFrame, a: float, dim1_points: int) -> go.Figure
     
     return fig
 
-def visualize_lattice_3d(df: pd.DataFrame, a: float, dim1_points: int, 
+def visualize_lattice_3d(df: pd.DataFrame, a: float, dim1_points: int,
                         wall_height: float = 1.0,
-                        show_lattice_points: bool = True, 
-                        show_arrows: bool = False) -> go.Figure:
+                        show_lattice_points: bool = True,
+                        show_walls: bool = True) -> go.Figure:
     """
     Optimized 3D visualization maintaining original interface.
     """
@@ -254,17 +233,16 @@ def visualize_lattice_3d(df: pd.DataFrame, a: float, dim1_points: int,
             ))
     
     # Add 3D hexagon structures
+    if show_walls and detail_level != 'low':
+        _add_hexagon_walls_mesh_3d(fig, df, _global_lattice, wall_height)
+    
     if detail_level == 'high':
         _add_full_wireframes_3d(fig, df, _global_lattice, wall_height, line_width)
     elif detail_level == 'medium':
         _add_medium_wireframes_3d(fig, df, _global_lattice, wall_height, line_width)
     else:  # low detail
         _add_simple_outlines_3d(fig, df, _global_lattice, wall_height, line_width)
-    
-    # Add arrows for small lattices
-    if show_arrows and detail_level == 'high':
-        _add_arrows_3d(fig, df, a, dim1_points, wall_height)
-    
+
     # Add ground reference
     if n_points < 1000:
         _add_ground_reference(fig, df, a)
@@ -285,6 +263,44 @@ def visualize_lattice_3d(df: pd.DataFrame, a: float, dim1_points: int,
     )
     
     return fig
+
+def _add_hexagon_walls_mesh_3d(fig, df, lattice, wall_height):
+    """DEBUG: Adds walls to all hexagons in the first row (y_step == 0)."""
+    
+    # 1. Define a palette of colors to cycle through
+    colors = ['lime', 'cyan', 'magenta', 'yellow', 'orange', 'white', 'blue', 'red']
+    
+    # 2. Filter the DataFrame to get only the first row of hexagons
+    first_row_df = df[df['y_step'] == 0].copy()
+    
+    if first_row_df.empty:
+        return
+
+    # 3. Loop through each hexagon in the first row and draw its walls
+    for i, (index, hex_data) in enumerate(first_row_df.iterrows()):
+        center_x = hex_data['x']
+        center_y = hex_data['y']
+        
+        hex_corners_x = center_x + lattice.hexagon_side_length * lattice.cos_angles
+        hex_corners_y = center_y + lattice.hexagon_side_length * lattice.sin_angles
+        
+        # Assign a color from the palette
+        color = colors[i % len(colors)]
+        
+        # Loop through the 6 sides of this hexagon to create a wall for each
+        for v in range(6):
+            p1_idx = v
+            p2_idx = (v + 1) % 6
+            
+            x_coords = [hex_corners_x[p1_idx], hex_corners_x[p2_idx], hex_corners_x[p2_idx], hex_corners_x[p1_idx]]
+            y_coords = [hex_corners_y[p1_idx], hex_corners_y[p2_idx], hex_corners_y[p2_idx], hex_corners_y[p1_idx]]
+            z_coords = [0, 0, wall_height, wall_height]
+
+            fig.add_trace(go.Mesh3d(
+                x=x_coords, y=y_coords, z=z_coords,
+                i=[0, 0], j=[1, 2], k=[2, 3],
+                color=color, opacity=1.0, name=f'Wall {i}-{v}'
+            ))
 
 # Helper functions for 3D visualization
 def _add_full_wireframes_3d(fig, df, lattice, wall_height, line_width):
@@ -372,35 +388,6 @@ def _add_simple_outlines_3d(fig, df, lattice, wall_height, line_width):
         showlegend=False,
         hoverinfo='skip'
     ))
-
-def _add_arrows_3d(fig, df, a, dim1_points, wall_height):
-    """Add 3D arrows."""
-    arrow_x, arrow_y, arrow_z = [], [], []
-    
-    for _, row in df.iterrows():
-        x_steps = row['x_step']
-        y_steps = row['y_step']
-        
-        if x_steps < dim1_points - 1:
-            start_x = row['x']
-            start_y = row['y']
-            end_x = a * (x_steps + 1) + a * (-0.5) * y_steps
-            end_y = a * (np.sqrt(3)/2) * y_steps
-            arrow_z_level = wall_height / 2
-            
-            arrow_x.extend([start_x, end_x, None])
-            arrow_y.extend([start_y, end_y, None])
-            arrow_z.extend([arrow_z_level, arrow_z_level, None])
-    
-    if arrow_x:  # Only add if there are arrows
-        fig.add_trace(go.Scatter3d(
-            x=arrow_x, y=arrow_y, z=arrow_z,
-            mode='lines',
-            line=dict(color='green', width=2),
-            name='Direction Arrows',
-            hoverinfo='skip',
-            showlegend=False
-        ))
 
 def _add_ground_reference(fig, df, a):
     """Add ground reference."""

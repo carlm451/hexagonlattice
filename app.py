@@ -20,7 +20,7 @@ def generate_lattice_data():
     # Get 3D specific parameters
     wall_height = float(request.form.get('wall_height', 1.0))
     show_lattice_points = request.form.get('show_lattice_points', 'true').lower() == 'true'
-    show_arrows = request.form.get('show_arrows', 'false').lower() == 'true'
+    show_walls = request.form.get('show_walls', 'true').lower() == 'true'
 
     if n_points > 25 or m_points > 25:
         return {'error': 'N and M values cannot exceed 25.'}, 400
@@ -39,7 +39,7 @@ def generate_lattice_data():
                 n_points, 
                 wall_height=wall_height,
                 show_lattice_points=show_lattice_points,
-                show_arrows=show_arrows
+                show_walls=show_walls
             )
         except Exception as e:
             raise ValueError(f"3D visualization failed: {e}")
